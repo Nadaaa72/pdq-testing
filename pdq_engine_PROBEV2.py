@@ -868,8 +868,11 @@ def check_end_of_clip_exit(movie_stats: dict) -> Optional[dict]:
         st = movie_stats[mid]
         total = int(st["total_frames"])
         avg = float(st["dist_sum"]) / max(int(st["dist_cnt"]), 1)
-        if avg <= 35.0 and total >= 2:
-            return {"movie_id": mid, "reason": f"P9E: Only movie overall with avg≤35 (avg={avg:.1f}) and frames={total} (≥2)",
+        # P9E's sliding floor (the V3 change, kept here): two frames are only enough when
+        # the evidence is good (avg ≤ 25); mediocre evidence needs four, like its sibling P9.
+        p9e_minf = 2 if avg <= 25.0 else 4
+        if avg <= 35.0 and total >= p9e_minf:
+            return {"movie_id": mid, "reason": f"P9E: Only movie overall with avg≤35 (avg={avg:.1f}) and frames={total} (≥{p9e_minf})",
                     "priority": 9, "immediate": True, "avg_hamming": avg}
         f35 = int(st["frames_35_45"])
         minf = _p9_min_frames(avg)
@@ -1283,15 +1286,11 @@ def identify_clip(video_path: str, index: LoadedIndex, *, verbose: bool = True, 
                     likely = md is not None and md < PROBE_ACCEPT_HAMMING
                     say(f"[PROBE] likely_match={likely} min_neighbor_hamming={md} closest_movie={index.label(best_v) if best_v is not None else None} "
                         f"closest_group={probe['group']} hashes={n_probe} elapsed={elapsed:.2f}s")
-                    if likely and best_v is not None:
-                        say(f"[PROBE] P0 triggered: min_hamming={md}<{PROBE_ACCEPT_HAMMING} → early exit eligible")
-                        accept = {"movie_id": best_v, "priority": 0, "immediate": True, "avg_hamming": float(md),
-                                  "reason": f"P0: probe min_hamming={md} < {PROBE_ACCEPT_HAMMING}"}
-                        st = movie_stats[best_v]
-                        if st["total_frames"] == 0:
-                            st["total_frames"], st["min_hamming"], st["avg_ham"], st["dist_sum"], st["dist_cnt"] = 1, float(md), float(md), float(md), 1
-                        exit_kind, exit_reason, reached_end = "EARLY_ACCEPT", accept["reason"], False
-                        break
+                    # P0 is RETIRED in this engine version. The probe V2 (whole clip, with
+                    # corroboration) replaces it; a single frame under 30 from the first four
+                    # seconds answers nothing any more. Genuine matches that P0 used to take
+                    # are caught by P1/P2 a moment later with more evidence. The probe still
+                    # runs for its other job: lowering the quality bar on clips with no hashes.
         # ---- every 4 new hashes: search, count, run the rules ----
         if total_hashes >= STREAM_START_HASHES and (total_hashes - last_checked) >= STREAM_BATCH_HASHES and frame_hashes:
             last_checked = total_hashes

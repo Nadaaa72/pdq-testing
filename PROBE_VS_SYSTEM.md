@@ -72,12 +72,58 @@ early reject. That is the test of "could we depend on the probe alone".
 
 ## Which rule gave each wrong answer
 
-*(results from `attribute_rules.py`, filled in when the runs finish)*
+All 125 testable clips through the pod's ORIGINAL rules, pre-scan on as in production
+(`output/attribution_ORIGINAL.csv`). Seven wrong answers reproduce, and every one is now
+pinned to the rule that made it:
+
+| rule | wrong answers | the clips, with the evidence they rode in on |
+|---|---|---|
+| SCAN (pre-scan) | 4 | Krrish 3 (best 6), The Northman (best 6), Captain America: Civil War (best 12), The In Between (best 18) |
+| P0 (old probe) | 1 | Smile (avg 26.8, 5 frames) |
+| P9E | 1 | Grave Encounters 2 (avg 34.0, 2 frames) |
+| P8 | 1 | The Last Voyage of the Demeter (avg 41.4, 31 frames) |
+
+The correct answers come from: SCAN 46, P0 3, P3.5 2, P1 1 - 52 in total.
+
+What this table proves: **the majority of wrong answers (4 of 7) come from the pre-scan**,
+at distances 6 to 18 - genuinely identical pictures - which is why no rule change could
+ever reach them. The three that do come from rules (P0, P9E, P8) are exactly the three my
+earlier changes target.
 
 ## The measurement
 
-*(same three numbers as always: wrong answers given, correct answers given, on the full
-wrong + correct lists - filled in when the runs finish)*
+Same yardstick as every week: wrong answers given and correct answers given, all 125 clips.
+
+| engine | wrong answers | correct answers |
+|---|---|---|
+| The pod's ORIGINAL rules | 7 | 52 |
+| **Probe V2 alone** (no streaming pass at all) | **1** | 41 |
+
+The probe alone removes six of the seven wrong answers. The one survivor is Krrish 3 at
+distance 6: the clip's pictures are identical to pictures in the index, so no
+picture-based check can refuse it. That one belongs with the orchestrator and the other
+detectives, with its scorecard.
+
+The cost is 11 correct answers (52 down to 41), and the pattern in them is the real
+finding: **in every lost case the right film was still the probe's top hint** - it just
+failed the new agreement bar. Most are montage-style clips (Soul, The Walking Dead, Bade
+Miyan ...) where a true match genuinely scatters across film time because the clip cuts
+between scenes. One (F1) is a sampling miss: the film occupies a small part of the clip
+and 40 spread samples barely touch it.
+
+Loosening the agreement bar to recover them would let The Northman and Civil War straight
+back in - on picture evidence those wrong answers look exactly like Soul. So the answer is
+not a looser probe. The two honest options:
+
+1. **Probe V2 as the decider, streaming rules as the fallback** (the drop-in mode): clips
+   the probe trusts are answered on the spot; clips it does not fall through to the full
+   pass, where P1/P3/P6 catch the montages with far more evidence. Measured next.
+2. Probe-only, and the 11 montage clips hand over to audio and SSCD as hints - the same
+   trade as "a no answer beats a wrong one", but now it costs real correct answers, so it
+   needs Jude's judgement, not mine.
+
+In this engine version the old P0 is retired (the probe V2 replaces it - Smile came
+through P0) and P9E keeps the V3 sliding floor (Grave Encounters 2).
 
 ## How to rerun any of this
 
