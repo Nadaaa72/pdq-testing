@@ -1,0 +1,15 @@
+# The Python packages Nada's PDQ folder needs. Install once with:
+#     pip install -r requirements.txt
+# Use Python 3.11 or 3.12. Tested with Python 3.12 on Windows on 4 Sep 2026.
+
+faiss-cpu==1.12.0        # the search library. Finds the closest fingerprints. The "cpu" build, no graphics card needed.
+pdqhash==0.2.8           # turns a picture into a 256-bit PDQ fingerprint. Ships a ready-made Windows build.
+numpy==1.26.4            # arrays of numbers. Everything above and below uses it.
+opencv-python==4.10.0.84 # reads and resizes pictures (the library is called cv2 inside Python).
+imageio-ffmpeg==0.5.1    # brings its own copy of ffmpeg, the tool that pulls frames out of a video. No separate install.
+boto3==1.42.38           # talks to our online storage (B2) to download fingerprints.
+yt-dlp>=2025.1.1         # downloads a clip from a TikTok, Instagram or YouTube link.
+tqdm==4.66.5             # the progress bars.
+python-dotenv==1.2.1     # reads credentials.env.
+psycopg2-binary==2.9.10  # talks to the pod's database, read-only, for the wrong-clip list (step 4).
+flask>=3.0,<4          # the little local web page (app.py). Runs on your laptop only.

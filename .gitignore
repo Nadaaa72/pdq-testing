@@ -1,0 +1,21 @@
+# The real credentials must never be saved to git.
+credentials.env
+
+# Downloaded fingerprints and the built index live in data/. They are big and
+# they are yours to rebuild. Only the small README in data/ is kept in git.
+data/*
+!data/README.md
+
+# The private box of libraries made by "py -3.12 -m venv .venv". Big, and rebuilt
+# in one command from requirements.txt, so it never goes to git.
+.venv/
+
+# Caches and scratch output.
+__pycache__/
+tmp/
+
+# Safety nets: clips are platform content, and pod/credential files must never
+# reach git (the pod access doc's own first rule).
+*.mp4
+POD_ACCESS*
+*.env
