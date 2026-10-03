@@ -27,7 +27,10 @@ import sys
 import time
 from pathlib import Path
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+# Only rewrap stdout when run as a script. Wrapping on import closes the stream of any
+# script that imported us (test_edits.py) and had already wrapped it.
+if __name__ == "__main__":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 HERE = Path(__file__).resolve().parent
 CLIPS = HERE / "data" / "clips"
 OUT = HERE / "output"

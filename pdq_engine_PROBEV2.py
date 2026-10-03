@@ -380,6 +380,26 @@ def pdq_hash(img: np.ndarray) -> Tuple[bytes, int]:
     return hb, int(q)
 
 
+def active_region(img: np.ndarray, dark: int = 26, min_keep: float = 0.94, min_px: int = 64) -> Optional[np.ndarray]:
+    """The picture inside letterbox/pillarbox bars, or None when there are no bars.
+
+    A simple version of the pod's 'active region crop', the speed trick the laptop port
+    left out - and the reason letterboxed clips scored 1 of 8 in the edit test. A row or
+    column counts as bars when nothing in it rises above near-black. Only returns a crop
+    when the bars are real (the picture is under min_keep of the frame in some direction),
+    so ordinary clips cost nothing extra."""
+    g = img.max(axis=2) if img.ndim == 3 else img
+    rows = np.where((g > dark).any(axis=1))[0]
+    cols = np.where((g > dark).any(axis=0))[0]
+    if len(rows) < min_px or len(cols) < min_px:
+        return None
+    y0, y1, x0, x1 = int(rows[0]), int(rows[-1]) + 1, int(cols[0]), int(cols[-1]) + 1
+    h, w = g.shape
+    if (y1 - y0) >= h * min_keep and (x1 - x0) >= w * min_keep:
+        return None
+    return img[y0:y1, x0:x1]
+
+
 def safe_trim_view(img: np.ndarray, top=0.06, bottom=0.14, side=0.03) -> Optional[np.ndarray]:
     """The frame with a thin border shaved off: 6% top, 14% bottom, 3% each side. TikTok
     puts captions and buttons there. The pod hashes this extra view for the first 40 kept
@@ -1061,16 +1081,26 @@ def super_probe(video_path: str, index: LoadedIndex, groups: List[str]):
             if not ok or bgr is None:
                 continue
             rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+            # The views of this frame. Beyond the plain frame: the picture inside any
+            # letterbox bars (edit test: letterbox scored 1/8 without this), and the
+            # mirror of each (the classic repost trick; mirror scored 0/8 without it).
+            views = [rgb]
+            region = active_region(rgb)
+            if region is not None:
+                views.append(region)
+            views += [np.ascontiguousarray(v[:, ::-1]) for v in list(views)]
             targets = []
-            if "FULL" in groups:
-                targets.append(("FULL", rgb))
-                sv = safe_trim_view(rgb)
-                if sv is not None:
-                    targets.append(("FULL", sv))
-            for c in CROPS:
-                g = group_for_crop_name(c.name)
-                if g in groups:
-                    targets.append((g, center_crop_aspect(rgb, c.ar_w, c.ar_h, c.scale)))
+            for vi, v in enumerate(views):
+                if "FULL" in groups:
+                    targets.append(("FULL", v))
+                    if vi == 0:
+                        sv = safe_trim_view(v)
+                        if sv is not None:
+                            targets.append(("FULL", sv))
+                for c in CROPS:
+                    g = group_for_crop_name(c.name)
+                    if g in groups:
+                        targets.append((g, center_crop_aspect(v, c.ar_w, c.ar_h, c.scale)))
             for g, img in targets:
                 hb, q = pdq_hash(img)
                 if q >= CLIP_QUALITY_MIN:

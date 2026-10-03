@@ -1,0 +1,81 @@
+clip,film,edit,unedited_rule,answered_film,verdict,stage,rule,reason,exit_kind,query_s
+vt_tiktok_com_ZSqXsLs5x___mirror.mp4,Magadheera,mirror,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=6,SCAN_ACCEPT,8.1
+vt_tiktok_com_ZSqXsLs5x___speed125.mp4,Magadheera,speed125,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=6,SCAN_ACCEPT,7.6
+vt_tiktok_com_ZSqXsLs5x___speed080.mp4,Magadheera,speed080,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=7,SCAN_ACCEPT,7.2
+vt_tiktok_com_ZSqXsLs5x___zoom120.mp4,Magadheera,zoom120,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-C,PV-C: probe-v2 best=20 frames_under_33=7 aligned=7 moments=7,SCAN_ACCEPT,7.3
+vt_tiktok_com_ZSqXsLs5x___filter.mp4,Magadheera,filter,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=6,SCAN_ACCEPT,8.7
+vt_tiktok_com_ZSqXsLs5x___gray.mp4,Magadheera,gray,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=6,SCAN_ACCEPT,11.7
+vt_tiktok_com_ZSqXsLs5x___letterbox.mp4,Magadheera,letterbox,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-A,PV-A: probe-v2 best=8 frames_under_16=5,SCAN_ACCEPT,11.8
+vt_tiktok_com_ZSqXsLs5x___caption.mp4,Magadheera,caption,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-A,PV-A: probe-v2 best=6 frames_under_16=3,SCAN_ACCEPT,7.9
+vt_tiktok_com_ZSqXsLs5x___rot2.mp4,Magadheera,rot2,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,8.6
+vt_tiktok_com_ZSqXsLs5x___lowq.mp4,Magadheera,lowq,SCAN,226907:Magadheera (tmdb=23790),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=6,SCAN_ACCEPT,9.8
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__mirror.mp4,The Kissing Booth 2,mirror,SCAN,223795:The Kissing Booth 2 (tmdb=583083),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=3 aligned=3,SCAN_ACCEPT,6.4
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__speed125.mp4,The Kissing Booth 2,speed125,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,8.4
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__speed080.mp4,The Kissing Booth 2,speed080,SCAN,223795:The Kissing Booth 2 (tmdb=583083),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=3 aligned=3,SCAN_ACCEPT,9.2
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__zoom120.mp4,The Kissing Booth 2,zoom120,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,6.6
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__filter.mp4,The Kissing Booth 2,filter,SCAN,223795:The Kissing Booth 2 (tmdb=583083),right film,probe-v2,PV-B,PV-B: probe-v2 best=16 frames_under_28=3 aligned=3,SCAN_ACCEPT,7.1
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__gray.mp4,The Kissing Booth 2,gray,SCAN,223795:The Kissing Booth 2 (tmdb=583083),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=3 aligned=3,SCAN_ACCEPT,9.3
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__letterbox.mp4,The Kissing Booth 2,letterbox,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,9.9
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__caption.mp4,The Kissing Booth 2,caption,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,6.2
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__rot2.mp4,The Kissing Booth 2,rot2,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,8.6
+www_instagram_com_reel_Ddnrx7iofhV_stkn_Y2NkY2N0NjM0dXVn__lowq.mp4,The Kissing Booth 2,lowq,SCAN,223795:The Kissing Booth 2 (tmdb=583083),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=3 aligned=3,SCAN_ACCEPT,6.3
+vm_tiktok_com_ZN8rNvaKw___mirror.mp4,Brick,mirror,SCAN,202981:Brick (tmdb=9270),right film,probe-v2,PV-B,PV-B: probe-v2 best=8 frames_under_28=6 aligned=2,SCAN_ACCEPT,15.6
+vm_tiktok_com_ZN8rNvaKw___speed125.mp4,Brick,speed125,SCAN,202981:Brick (tmdb=9270),right film,probe-v2,PV-B,PV-B: probe-v2 best=12 frames_under_28=6 aligned=2,SCAN_ACCEPT,15.5
+vm_tiktok_com_ZN8rNvaKw___speed080.mp4,Brick,speed080,SCAN,202981:Brick (tmdb=9270),right film,probe-v2,PV-B,PV-B: probe-v2 best=8 frames_under_28=6 aligned=2,SCAN_ACCEPT,15.0
+vm_tiktok_com_ZN8rNvaKw___zoom120.mp4,Brick,zoom120,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,11.1
+vm_tiktok_com_ZN8rNvaKw___filter.mp4,Brick,filter,SCAN,202981:Brick (tmdb=9270),right film,probe-v2,PV-B,PV-B: probe-v2 best=8 frames_under_28=6 aligned=2,SCAN_ACCEPT,11.6
+vm_tiktok_com_ZN8rNvaKw___gray.mp4,Brick,gray,SCAN,202981:Brick (tmdb=9270),right film,probe-v2,PV-B,PV-B: probe-v2 best=8 frames_under_28=6 aligned=2,SCAN_ACCEPT,12.0
+vm_tiktok_com_ZN8rNvaKw___letterbox.mp4,Brick,letterbox,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,15.5
+vm_tiktok_com_ZN8rNvaKw___caption.mp4,Brick,caption,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,11.4
+vm_tiktok_com_ZN8rNvaKw___rot2.mp4,Brick,rot2,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,11.6
+vm_tiktok_com_ZN8rNvaKw___lowq.mp4,Brick,lowq,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,14.0
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___mirror.mp4,The Family Plan,mirror,SCAN,6001:The Family Plan (tmdb=1029575),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=9 aligned=9,SCAN_ACCEPT,17.2
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___speed125.mp4,The Family Plan,speed125,SCAN,6001:The Family Plan (tmdb=1029575),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=11 aligned=6,SCAN_ACCEPT,18.1
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___speed080.mp4,The Family Plan,speed080,SCAN,6001:The Family Plan (tmdb=1029575),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=8 aligned=6,SCAN_ACCEPT,16.7
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___zoom120.mp4,The Family Plan,zoom120,SCAN,,ERROR,,,cannot open video: C:\Users\nadaa\pdq_for_nada\data\clips_edited\www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___zoom120.mp4,,0.3
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___filter.mp4,The Family Plan,filter,SCAN,6001:The Family Plan (tmdb=1029575),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=9 aligned=9,SCAN_ACCEPT,16.1
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___gray.mp4,The Family Plan,gray,SCAN,6001:The Family Plan (tmdb=1029575),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=10 aligned=10,SCAN_ACCEPT,17.6
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___letterbox.mp4,The Family Plan,letterbox,SCAN,6001:The Family Plan (tmdb=1029575),right film,probe-v2,PV-B,PV-B: probe-v2 best=16 frames_under_28=9 aligned=9,SCAN_ACCEPT,23.0
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___caption.mp4,The Family Plan,caption,SCAN,6001:The Family Plan (tmdb=1029575),right film,probe-v2,PV-B,PV-B: probe-v2 best=18 frames_under_28=4 aligned=4,SCAN_ACCEPT,15.0
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___rot2.mp4,The Family Plan,rot2,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,14.8
+www_instagram_com_reel_Ddl9xIHoEmj_stkn_MW10MjJjMmtxZXAwZw___lowq.mp4,The Family Plan,lowq,SCAN,6001:The Family Plan (tmdb=1029575),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=7 aligned=7,SCAN_ACCEPT,14.5
+vm_tiktok_com_ZN8M9JmrK___mirror.mp4,Rise of the Guardians,mirror,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=9,SCAN_ACCEPT,11.4
+vm_tiktok_com_ZN8M9JmrK___speed125.mp4,Rise of the Guardians,speed125,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=6,SCAN_ACCEPT,10.8
+vm_tiktok_com_ZN8M9JmrK___speed080.mp4,Rise of the Guardians,speed080,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=9,SCAN_ACCEPT,14.7
+vm_tiktok_com_ZN8M9JmrK___zoom120.mp4,Rise of the Guardians,zoom120,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=9 aligned=8,SCAN_ACCEPT,11.1
+vm_tiktok_com_ZN8M9JmrK___filter.mp4,Rise of the Guardians,filter,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=10,SCAN_ACCEPT,11.1
+vm_tiktok_com_ZN8M9JmrK___gray.mp4,Rise of the Guardians,gray,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=9,SCAN_ACCEPT,12.8
+vm_tiktok_com_ZN8M9JmrK___letterbox.mp4,Rise of the Guardians,letterbox,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-A,PV-A: probe-v2 best=6 frames_under_16=8,SCAN_ACCEPT,14.8
+vm_tiktok_com_ZN8M9JmrK___caption.mp4,Rise of the Guardians,caption,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-A,PV-A: probe-v2 best=8 frames_under_16=2,SCAN_ACCEPT,14.5
+vm_tiktok_com_ZN8M9JmrK___rot2.mp4,Rise of the Guardians,rot2,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-C,PV-C: probe-v2 best=22 frames_under_33=5 aligned=4 moments=3,SCAN_ACCEPT,11.1
+vm_tiktok_com_ZN8M9JmrK___lowq.mp4,Rise of the Guardians,lowq,SCAN,2103:Rise of the Guardians (tmdb=81188),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=9,SCAN_ACCEPT,11.8
+vt_tiktok_com_ZSb19UckU___mirror.mp4,Knights of the Zodiac,mirror,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=6,SCAN_ACCEPT,7.2
+vt_tiktok_com_ZSb19UckU___speed125.mp4,Knights of the Zodiac,speed125,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=6,SCAN_ACCEPT,6.4
+vt_tiktok_com_ZSb19UckU___speed080.mp4,Knights of the Zodiac,speed080,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-A,PV-A: probe-v2 best=6 frames_under_16=4,SCAN_ACCEPT,6.0
+vt_tiktok_com_ZSb19UckU___zoom120.mp4,Knights of the Zodiac,zoom120,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-B,PV-B: probe-v2 best=18 frames_under_28=5 aligned=3,SCAN_ACCEPT,5.2
+vt_tiktok_com_ZSb19UckU___filter.mp4,Knights of the Zodiac,filter,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=6,SCAN_ACCEPT,6.0
+vt_tiktok_com_ZSb19UckU___gray.mp4,Knights of the Zodiac,gray,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=6,SCAN_ACCEPT,5.9
+vt_tiktok_com_ZSb19UckU___letterbox.mp4,Knights of the Zodiac,letterbox,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-A,PV-A: probe-v2 best=8 frames_under_16=2,SCAN_ACCEPT,5.5
+vt_tiktok_com_ZSb19UckU___caption.mp4,Knights of the Zodiac,caption,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-A,PV-A: probe-v2 best=8 frames_under_16=5,SCAN_ACCEPT,7.3
+vt_tiktok_com_ZSb19UckU___rot2.mp4,Knights of the Zodiac,rot2,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,8.4
+vt_tiktok_com_ZSb19UckU___lowq.mp4,Knights of the Zodiac,lowq,SCAN,215345:Knights of the Zodiac (tmdb=455476),right film,probe-v2,PV-A,PV-A: probe-v2 best=6 frames_under_16=6,SCAN_ACCEPT,6.0
+vt_tiktok_com_ZSqK8X9QX___mirror.mp4,The Forge,mirror,SCAN,60097:The Forge (tmdb=1186532),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=8,SCAN_ACCEPT,5.1
+vt_tiktok_com_ZSqK8X9QX___speed125.mp4,The Forge,speed125,SCAN,60097:The Forge (tmdb=1186532),right film,probe-v2,PV-A,PV-A: probe-v2 best=0 frames_under_16=12,SCAN_ACCEPT,5.4
+vt_tiktok_com_ZSqK8X9QX___speed080.mp4,The Forge,speed080,SCAN,60097:The Forge (tmdb=1186532),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=8,SCAN_ACCEPT,4.8
+vt_tiktok_com_ZSqK8X9QX___zoom120.mp4,The Forge,zoom120,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,4.8
+vt_tiktok_com_ZSqK8X9QX___filter.mp4,The Forge,filter,SCAN,60097:The Forge (tmdb=1186532),right film,probe-v2,PV-A,PV-A: probe-v2 best=4 frames_under_16=8,SCAN_ACCEPT,4.8
+vt_tiktok_com_ZSqK8X9QX___gray.mp4,The Forge,gray,SCAN,60097:The Forge (tmdb=1186532),right film,probe-v2,PV-A,PV-A: probe-v2 best=0 frames_under_16=8,SCAN_ACCEPT,4.9
+vt_tiktok_com_ZSqK8X9QX___letterbox.mp4,The Forge,letterbox,SCAN,60097:The Forge (tmdb=1186532),right film,probe-v2,PV-A,PV-A: probe-v2 best=6 frames_under_16=11,SCAN_ACCEPT,9.5
+vt_tiktok_com_ZSqK8X9QX___caption.mp4,The Forge,caption,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,8.0
+vt_tiktok_com_ZSqK8X9QX___rot2.mp4,The Forge,rot2,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,148.2
+vt_tiktok_com_ZSqK8X9QX___lowq.mp4,The Forge,lowq,SCAN,60097:The Forge (tmdb=1186532),right film,probe-v2,PV-A,PV-A: probe-v2 best=2 frames_under_16=9,SCAN_ACCEPT,11.2
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__mirror.mp4,Cocktail 2,mirror,SCAN,222924:Cocktail 2 (tmdb=1392469),right film,probe-v2,PV-B,PV-B: probe-v2 best=12 frames_under_28=5 aligned=3,SCAN_ACCEPT,70.9
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__speed125.mp4,Cocktail 2,speed125,SCAN,,ERROR,,,cannot open video: C:\Users\nadaa\pdq_for_nada\data\clips_edited\youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__speed125.mp4,,0.2
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__speed080.mp4,Cocktail 2,speed080,SCAN,222924:Cocktail 2 (tmdb=1392469),right film,probe-v2,PV-B,PV-B: probe-v2 best=12 frames_under_28=5 aligned=3,SCAN_ACCEPT,73.5
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__zoom120.mp4,Cocktail 2,zoom120,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,64.2
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__filter.mp4,Cocktail 2,filter,SCAN,222924:Cocktail 2 (tmdb=1392469),right film,probe-v2,PV-C,PV-C: probe-v2 best=12 frames_under_33=5 aligned=3 moments=3,SCAN_ACCEPT,67.1
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__gray.mp4,Cocktail 2,gray,SCAN,222924:Cocktail 2 (tmdb=1392469),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=5 aligned=3,SCAN_ACCEPT,67.2
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__letterbox.mp4,Cocktail 2,letterbox,SCAN,222924:Cocktail 2 (tmdb=1392469),right film,probe-v2,PV-B,PV-B: probe-v2 best=12 frames_under_28=5 aligned=3,SCAN_ACCEPT,86.2
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__caption.mp4,Cocktail 2,caption,SCAN,222924:Cocktail 2 (tmdb=1392469),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=5 aligned=3,SCAN_ACCEPT,60.1
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__rot2.mp4,Cocktail 2,rot2,SCAN,,no answer,no-answer,PROBE_NO_MATCH,probe-v2 found no film it trusts,PROBE_NO_MATCH,65.7
+youtube_com_shorts_mJCAh3yiuyU_si_Ovs0LRFJAGvSy3Ib__lowq.mp4,Cocktail 2,lowq,SCAN,222924:Cocktail 2 (tmdb=1392469),right film,probe-v2,PV-B,PV-B: probe-v2 best=14 frames_under_28=5 aligned=3,SCAN_ACCEPT,62.8

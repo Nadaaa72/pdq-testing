@@ -113,17 +113,79 @@ and 40 spread samples barely touch it.
 
 Loosening the agreement bar to recover them would let The Northman and Civil War straight
 back in - on picture evidence those wrong answers look exactly like Soul. So the answer is
-not a looser probe. The two honest options:
+not a looser probe but the **drop-in mode**: probe V2 decides what it trusts, and clips it
+does not fall through to the streaming rules, where P1/P3/P6 see far more evidence. In
+this engine version the old P0 is retired (the probe V2 replaces it - Smile came through
+P0) and P9E keeps the V3 sliding floor (Grave Encounters 2). Measured:
 
-1. **Probe V2 as the decider, streaming rules as the fallback** (the drop-in mode): clips
-   the probe trusts are answered on the spot; clips it does not fall through to the full
-   pass, where P1/P3/P6 catch the montages with far more evidence. Measured next.
-2. Probe-only, and the 11 montage clips hand over to audio and SSCD as hints - the same
-   trade as "a no answer beats a wrong one", but now it costs real correct answers, so it
-   needs Jude's judgement, not mine.
+| engine | wrong | correct |
+|---|---|---|
+| The pod's ORIGINAL rules | 7 | 52 |
+| Probe V2 alone | 1 | 41 |
+| **Probe V2 + streaming fallback (drop-in)** | **1** | **48** |
 
-In this engine version the old P0 is retired (the probe V2 replaces it - Smile came
-through P0) and P9E keeps the V3 sliding floor (Grave Encounters 2).
+Six of seven wrong answers gone for the price of four correct ones - and those four
+(Race to Witch Mountain, Bruce Almighty, This Is Where I Leave You, The Walking Dead) are
+montage clips the probe declines and the streaming pass then early-rejects before reaching
+the matching segment. Recovering them means readmitting Northman and Civil War; on the
+"a no answer beats a wrong one" rule I have left them out, but it is a policy choice and
+I would like Jude's confirmation.
+
+Two flags from the full tables:
+
+- The "Misfits" wrong-list clip is answered **F1: The Movie** (P1, distance 8) by both
+  the pod's ORIGINAL rules and probe V2 - the pod's live answer was The Misfits. Either
+  the index has changed or the live answer came from another detective. Ground truth
+  unknown; worth checking the clip.
+- Krrish 3, the one wrong answer no version removes, matches at distance 6: the pictures
+  are identical to pictures in the index. Not solvable by any picture-based check.
+
+## How the system copes with edited clips
+
+Ten edits a reposter actually makes, applied one at a time to 8 clips every engine
+identifies correctly unedited, so any failure is caused by the edit alone
+(`make_edited_clips.py`, tested by `test_edits.py`). Right answers out of 8 (* = /7, one
+variant file was corrupt):
+
+| edit | pod ORIGINAL | probe V2 before fixes | probe V2 after fixes |
+|---|---|---|---|
+| colour filter | 8 | 8 | 8 |
+| black and white | 8 | 8 | 8 |
+| heavy recompression | 8 | 7 | 7 |
+| speed x0.8 | 8 | 8 | 8 |
+| speed x1.25 | 7 | 6* | 6* |
+| caption bars | 6 | 5 | 5 |
+| zoom 20% | 5 | 3* | 3* |
+| rotation 2 deg | 5 | 1 | 1 |
+| **letterbox** | **1** | **1** | **6** |
+| **mirror** | **0** | **0** | **8** |
+
+No edit ever produced a wrong film on any engine - edits only silence the system. The two
+catastrophic holes were both "what the pod-side tech has that this decider doesn't":
+
+- **Mirror (0 of 8 everywhere)**: nothing hashed flipped frames. The probe V2 now hashes
+  the mirror of every sampled view. Mirrored reposts went from never identified to 8 of 8,
+  at distance 2 - PDQ sees through the flip perfectly once someone looks.
+- **Letterbox (1 of 8)**: the pod's *active region crop* was the speed trick left out of
+  the laptop port. The probe V2 now trims near-black bars (`active_region()`) and hashes
+  the picture inside; 1 of 8 became 6 of 8. The two still missed have non-black bars after
+  recompression.
+- **Speed changes did NOT break the film-time agreement check** - the 3-second tolerance
+  absorbs a 25% speed change over a sampled clip. The planned drift fix was not needed.
+- Rotation and zoom degrade the hashes themselves (PDQ is not rotation-invariant); the
+  pod only survives them through its weakest rules (P3.5, P0, P9). In drop-in mode those
+  clips fall through to the same rules, so nothing is lost against the pod.
+
+The gate for the fixes: re-running the full 125 real clips with the new views changed
+**zero answers** - 1 wrong / 48 correct in drop-in mode and 1 / 41 probe-only, before and
+after. The mirror and bar-trim views are purely additive.
+
+One honest cost: the extra views make the probe about four times more search-heavy per
+clip (roughly 2 minutes instead of 30 seconds on my laptop against 16.7 million
+fingerprints). Irrelevant for this measurement work, but if the probe ever replaces the
+pre-scan on the pod, the obvious shape is: plain views first, and the mirror and bar-trim
+views only when the plain views found nothing. Ordinary clips then cost exactly what the
+pre-scan costs today, and only the suspicious ones pay for the second look.
 
 ## How to rerun any of this
 
