@@ -144,6 +144,16 @@ def md_to_flowables(md: str, right_label: str):
             E.append(Paragraph(inline(st), BULL))
         elif st.startswith("- "):
             E.append(Paragraph("•  " + inline(st[2:]), BULL))
+        elif st.startswith("!["):
+            # ![caption](path/to/image.png) - a screenshot, scaled to the text width
+            m = re.match(r"^!\[[^\]]*\]\(([^)]+)\)$", st)
+            img_path = HERE / m.group(1) if m else None
+            if img_path is not None and img_path.is_file():
+                from PIL import Image as PILImage
+                pw, ph = PILImage.open(str(img_path)).size
+                w = min(15.5 * cm, pw * 0.65)       # never blow a small shot up past readable
+                E.append(Image(str(img_path), width=w, height=w * ph / pw))
+                E.append(Spacer(1, 0.3 * cm))
         elif st:
             para = [st]
             while i + 1 < len(lines) and lines[i + 1].strip() and not re.match(r"^(#|\||-|\d+\.|```|\*|---)", lines[i + 1].strip()):

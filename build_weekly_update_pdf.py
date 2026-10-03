@@ -8,8 +8,8 @@ from build_pdf import footer, md_to_flowables
 
 
 HERE = Path(__file__).resolve().parent
-SOURCE = HERE / "PDQ_WEEKLY_UPDATE_19_SEPTEMBER_2026.md"
-OUTPUT = HERE / "output" / "pdf" / "PDQ_WEEKLY_UPDATE_19_SEPTEMBER_2026.pdf"
+SOURCE = HERE / "PDQ_WEEKLY_UPDATE_04_OCTOBER_2026.md"
+OUTPUT = HERE / "PDQ_WEEKLY_UPDATE_04_OCTOBER_2026.pdf"
 
 
 def build() -> Path:
@@ -22,9 +22,9 @@ def build() -> Path:
         rightMargin=2 * cm,
         topMargin=1.6 * cm,
         bottomMargin=2 * cm,
-        title="Fixing the PDQ false positive",
+        title="Changing the tech, not the thresholds",
         author="Nada",
-        subject="PDQ weekly findings - 19 September 2026",
+        subject="PDQ weekly findings - 4 October 2026",
     )
     flowables = md_to_flowables(markdown, "PDQ - WEEKLY FINDINGS")
     # The report uses small comparison tables. Keep each one on a single page
