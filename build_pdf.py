@@ -38,6 +38,7 @@ H1 = ParagraphStyle("h1", parent=s["Heading2"], fontName="Helvetica-Bold", fontS
 H2 = ParagraphStyle("h2", parent=s["Heading3"], fontName="Helvetica-Bold", fontSize=11.5, leading=15, textColor=ACCENT, spaceBefore=12, spaceAfter=6)
 BODY = ParagraphStyle("b", parent=s["BodyText"], fontName="Helvetica", fontSize=10, leading=15.5, textColor=DARK, spaceAfter=9)
 BULL = ParagraphStyle("bu", parent=BODY, leftIndent=14, bulletIndent=4, spaceAfter=5)
+QUOTE = ParagraphStyle("q", parent=BODY, leftIndent=16, textColor=DARK, spaceAfter=7)
 CODE = ParagraphStyle("cd", fontName="Courier", fontSize=8.2, leading=11, textColor=DARK,
                       backColor=colors.HexColor("#F4F6FA"), borderColor=colors.HexColor("#C9D6E5"),
                       borderWidth=0.75, borderPadding=8, spaceBefore=4, spaceAfter=10)
@@ -144,6 +145,19 @@ def md_to_flowables(md: str, right_label: str):
             E.append(Paragraph(inline(st), BULL))
         elif st.startswith("- "):
             E.append(Paragraph("•  " + inline(st[2:]), BULL))
+        elif st.startswith(">"):
+            # "> " lines are the spoken parts of a meeting script. Consecutive lines join
+            # into one paragraph; a bare ">" line is a pause between paragraphs.
+            para = [st.lstrip(">").strip()]
+            while i + 1 < len(lines) and lines[i + 1].strip().startswith(">"):
+                i += 1
+                nxt = lines[i].strip().lstrip(">").strip()
+                if nxt:
+                    para.append(nxt)
+                elif para:
+                    E.append(P(" ".join(para), QUOTE)); para = []
+            if para:
+                E.append(P(" ".join(para), QUOTE))
         elif st.startswith("!["):
             # ![caption](path/to/image.png) - a screenshot, scaled to the text width
             m = re.match(r"^!\[[^\]]*\]\(([^)]+)\)$", st)
