@@ -112,6 +112,8 @@ and zoom degrade it. Two edits blinded it completely: mirroring (0 of 8) and let
   version into the probe. Letterboxed clips: 1 of 8 to 6 of 8. The two still missed have
   bars that are not quite black after recompression.
 
+![what the two blinding edits look like](output/shots/edit_examples.png)
+
 ![how each edit fares after the fixes](output/shots/edits_after.png)
 
 ![the same two clips, before and after](output/shots/mirror_fix.png)
