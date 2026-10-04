@@ -5,7 +5,7 @@ For me only. The document on the table is PDQ_WEEKLY_UPDATE_04_OCTOBER_2026.pdf.
 Same rule as last time: don't read it word for word. Read a section, look up, say it the
 way it comes out. The numbers are the only part to get exactly right.
 
-About eight minutes at a normal pace.
+About nine minutes at a normal pace.
 
 ---
 
@@ -13,143 +13,194 @@ About eight minutes at a normal pace.
 
 **Have the document closed. Just talk.**
 
-> Last week you told me to stop bending the thresholds and change the actual tech. So
-> this week was three jobs.
+> Last week you told me to change the actual tech instead of just tightening the rules.
+> So this week I did three things.
 >
-> First, I made the testing honest: every clip I run now records which rule gave the
-> answer. So when something is wrong, I know exactly which part of the engine did it,
-> not just that it happened.
+> First, I changed how I test. Before, I could tell you a clip got the wrong film, but
+> not which part of the engine made the mistake. Now, every time I run a clip, it writes
+> down which rule gave the answer. So every mistake has a name next to it.
 >
-> Second, I compared the three parts of the engine that can answer, worked out what the
-> careful rules have that the pre-scan and the probe don't, and rebuilt the probe out of
-> the missing pieces.
+> Second, I went looking for what the careful parts of the engine have that the quick
+> parts don't, and I rebuilt the probe out of what was missing.
 >
-> Third, I built an edits test. Ten things a reposter actually does to a clip, applied
-> one at a time to clips the engine gets right, so any failure is the edit's fault and
-> nothing else. That found two places where the engine is completely blind, and I fixed
-> both.
+> Third, I tested edited clips. I took clips the engine gets right, made ten edited
+> copies of each, the kinds of edits people actually do when they repost, and ran those.
+> If a copy fails, the edit is the reason, because the original worked. That found two
+> edits where the engine is completely blind, and I fixed both.
 >
-> The headline: the pod's rules give seven wrong answers on my full set. The rebuilt
-> probe with the rules behind it gives one. And of the fifty-two correct answers, I keep
+> The numbers first: on my full test set, the pod's rules give seven wrong answers. My
+> new version gives one. And of the fifty-two clips the pod gets right, I still get
 > forty-eight. I'll go through it.
 
 ---
+
+
 
 ## 1. Which rule gave the wrong answers
 
 **Open at section 1. Point at the screenshot.**
 
-> This is the printout, not a summary. All 125 clips through the pod's exact rules, and
-> every answer tagged with the rule that produced it.
+> This is the printout. All 125 clips through the pod's exact rules, and every answer
+> tagged with the rule that produced it.
 >
-> Seven wrong answers reproduce. Four of them come from the pre-scan, and look at the
-> distances: six, six, twelve, eighteen. Those pictures genuinely are in the index. The
-> rules never even ran on those clips, which is why the last two weeks of rule changes
-> could never have caught them. The other three are P0, P9E and P8, which are exactly
-> the three my earlier changes went after.
+> Seven wrong answers show up, and four of them come from the pre-scan. The pre-scan is
+> the quick skim the engine does before anything else: it grabs forty frames spread
+> across the clip, and if some film clearly has those pictures, it answers on the spot
+> and nothing else ever runs.
 >
-> So the thing I'd been tuning could only ever reach three of the seven. That's the
-> clearest argument I have for what you said last week.
+> Now look at the distances on those four. Distance is how different two pictures are.
+> Zero means identical, and anything under about twenty is the same picture for all
+> practical purposes. These four matched at six, six, twelve and eighteen. So those
+> pictures genuinely are in our library, just attached to the wrong film, probably
+> shared footage, things like trailers. The rules never ran on those clips at all. Which
+> means two weeks of me adjusting rules could never have fixed them, whatever numbers I
+> picked.
+>
+> The other three wrong answers did come from rules, and they're exactly the three rules
+> I'd already changed. So the tuning I was doing could only ever reach three of the
+> seven. That's the clearest proof of what you told me last week.
 
 ---
 
-## 2. What the system has that the deciders don't
+
+
+## 2. What the careful rules have that the quick parts don't
 
 **Section 2. The small table.**
 
-> The engine can answer from three places. The pre-scan, the probe, and the rules.
+> The engine can answer from three places: the pre-scan, the probe, and the rules. The
+> strange thing is how differently careful they are.
 >
-> The careful rules check three things: lots of frames, the frames agreeing on where in
-> the film they land, and the frames coming from more than one moment of the clip.
+> The careful rules check three things before they answer. Did a lot of frames match.
+> Do those frames all point at the same place in the film. And did they come from
+> different moments of my clip, not just one frozen frame.
 >
-> The pre-scan and the probe, which between them decide almost everything, check none of
-> that. The probe answers off one frame. And the engine's own notes say a true match
-> gives the same offset for every frame. That's the strongest signal in the data and
-> the two busiest parts of the engine ignore it.
+> That middle check is worth thirty seconds, because the whole week hangs on it. If my
+> clip really is a scene from a film, then every frame of my clip matches the film at
+> the same point. First frame matches minute forty, next frame matches minute forty plus
+> one second, and so on. They all agree. A coincidence doesn't look like that. A
+> coincidence picks up one stray frame from minute ten, another from minute fifty,
+> scattered all over. The engine's own documentation says this is what a true match
+> looks like.
+>
+> But the pre-scan and the probe, which between them give most of the answers, do none
+> of these checks. The probe would answer off one single frame. So the parts doing most
+> of the deciding do the least checking.
 
 ---
+
+
 
 ## 3. The rebuilt probe
 
 **Section 3. Don't linger, the next section is the point.**
 
-> So the new probe is just: the pre-scan's whole-clip view, plus all the checks it never
-> had. It samples forty frames across the clip, keeps a scorecard per film, and it only
-> answers on three bars, each copied from a rule the pod already trusts. Two near-perfect
-> frames. Or the old pre-scan bar plus agreement on film time. Or five medium frames that
-> agree and come from two moments of the clip.
+> The new probe is those missing pieces put together. It skims the whole clip, forty
+> frames, like the pre-scan. But instead of just counting hits, it keeps a scorecard for
+> every film: how many frames hit it, how good the best one is, whether they agree on
+> where in the film they land, and whether they came from different parts of my clip.
 >
-> The old one-frame probe is retired. This replaces it.
+> And it only answers in three situations, each copied from a rule the pod already
+> trusts. Two near-identical frames. Or what the pre-scan used to need, plus the frames
+> agreeing on film position. Or five decent frames that agree and come from two
+> different moments of the clip.
+>
+> The old probe, the one-frame one, is switched off. This replaces it.
 
 ---
+
+
 
 ## 4. The measurement
 
 **Section 4. Point at the three-line table, then the screenshot.**
 
-> Same yardstick as every week, both numbers, all 125 clips.
+> Both numbers, same as every week, all 125 clips.
 >
-> Pod's rules: seven wrong, fifty-two correct. The new probe entirely on its own: one
-> wrong, forty-one. With the rules running behind it as the fallback: still one wrong,
-> and forty-eight correct.
+> The pod's rules: seven wrong, fifty-two right. The new probe completely on its own,
+> everything else switched off: one wrong, forty-one right. And the version I'd actually
+> propose, the new probe with the rules kept as a backup for the clips it isn't sure
+> about: one wrong, forty-eight right.
 >
-> The one that survives is Krrish 3, at distance six. The pictures are identical to
-> pictures in the index. Nothing picture-based can refuse that; it needs audio or SSCD.
+> The one wrong answer left is Krrish 3, matching at distance six. The pictures in that
+> clip are in our library, and they are identical. No check that works on pictures can
+> turn that away. That one needs the audio detective or SSCD.
 >
-> The four correct answers I lose are all montage clips. The right film was the top
-> candidate every single time, it just scatters across film time because the clip cuts
-> between scenes. I can get them back, but the exact same loosening lets The Northman
-> and Civil War back in, because on picture evidence they look the same. You told me a
-> no answer beats a wrong one, so I left them out. But that's a policy call and I'd
+> The four right answers I lose are all the same kind of clip: fan edits that jump
+> between scenes. The right film was actually the top candidate on every one of them,
+> but the frames point at many different places in the film, because the clip really
+> does jump around, so my agreement check turns them away. I measured what happens if I
+> loosen the check to let them back in: two of the wrong answers come back with them,
+> because on pictures alone they look the same. You told me a no answer is better than a
+> wrong one, so I kept it strict. But that's a choice about what Trace prefers, and I'd
 > rather you made it than me.
 >
-> One more thing from the tables. The clip the pod answered as The Misfits comes back as
-> F1: The Movie, at distance eight, on both the pod's rules and mine. Worth watching
-> that clip. Something doesn't add up about where the live answer came from.
+> One more thing from the tables. There's a clip the pod answered as The Misfits, and a
+> user voted it wrong. When I run that clip, the pod's own rules and mine both say F1,
+> the Formula One film, at distance eight. Someone should watch that clip, because the
+> live answer may not have come from where we think it did.
 
 ---
+
+
 
 ## 5. The edits test
 
 **Section 5. The edit table screenshot, then the before-and-after one.**
 
-> Ten edits, each applied to eight clips the engine identifies correctly unedited.
+> For the edits test I took eight clips the engine identifies correctly, and made ten
+> edited copies of each. The edits are the ones reposters actually do: a colour filter,
+> black and white, re-compressing, speeding up, slowing down, zooming in, tilting it a
+> couple of degrees, caption bars, shrinking it inside a black frame, and flipping it
+> left-to-right.
 >
-> First thing: no edit ever produced a wrong film. Anywhere. Edits don't fool the
-> engine, they blind it. It goes quiet instead of guessing.
+> First result, which surprised me: not one edit, on any version of the engine, produced
+> a wrong film. When an edit beats the engine, the engine goes quiet. It doesn't guess.
 >
-> Filters, black and white, recompression, speed changes: barely a scratch. Rotation and
-> zoom hurt. And two edits blinded it completely. Mirroring: zero out of eight. And
-> letterboxing: one out of eight.
+> Most edits barely hurt. Filters, black and white, re-compression, speed changes,
+> nearly everything still gets identified. Two edits made it completely blind, though.
+> The flip: zero out of eight identified. And the black frame: one out of eight.
 >
-> Both turned out to be missing tech. Nothing in the engine ever hashes a flipped frame,
-> so I made the probe hash the mirror of everything it samples. Zero out of eight became
-> eight out of eight, matching at distance two. And the pod has an active-region crop
-> that finds the picture inside black bars, which is one of the pieces the laptop port
-> left out. I built a simple version. One out of eight became six out of eight.
+> Both turned out to be missing machinery rather than bad thresholds. Nothing anywhere
+> in the engine ever looks at the flipped picture, so a mirrored repost can't match
+> anything. I made the probe also fingerprint the mirror image of each frame it samples,
+> and zero out of eight became eight out of eight, matching at distance two, basically
+> perfect. For the black frame, the pod has a trick called the active region crop that
+> finds the picture inside the borders, and it's one of the pieces that never made it
+> into my laptop copy. I built a simple version: find the black bars, cut them off,
+> fingerprint what's inside. One out of eight became six out of eight. The two still
+> missed have bars that aren't quite black, so my simple version doesn't see them as
+> bars.
 >
-> Then the safety gate: I re-ran all 125 real clips with the new views on. Not one
-> answer changed. The extra views only add, they never subtract.
+> Then I checked I hadn't broken anything. I re-ran all 125 real clips with the new
+> views switched on, and not a single answer changed, in either direction.
 >
-> The honest cost is the probe is about four times slower with the extra views. On my
-> laptop, irrelevant. If this goes near the pod, you'd run plain views first and only
-> pay for the second look when the plain views find nothing.
+> The cost is speed: with the extra views the probe takes about four times longer per
+> clip. On my laptop that doesn't matter. If this ever goes towards the pod, the way to
+> do it is to try the normal views first and only do the mirror and border checks when
+> the normal ones found nothing. Then an ordinary clip costs the same as it does today.
 
 ---
+
+
 
 ## 6. Housekeeping
 
 **Section 6. Quick.**
 
-> Three small things. Everything is in a private GitHub repo now, pdq-testing, code and
-> results, and I can add you to it today.
+> Three quick things. All the code and results are in a private GitHub repo now, called
+> pdq-testing. I can add you to it today.
 >
-> Pod access works from my machine, verified read-only, nothing touched.
+> Pod access works from my machine. I tested it read-only: looked at the hostname and
+> the ready status, touched nothing.
 >
-> And while setting that up, the access doc with the key in it ended up pasted into a
-> chat. So if you'd rather rotate the key, now's a clean moment. Your call.
+> And one thing I should flag. While I was setting that up, the access document with the
+> key in it got pasted into a chat. If you'd rather rotate the key, this is a clean
+> moment to do it. Your call.
 
 ---
+
+
 
 ## 7. The asks
 
@@ -157,34 +208,42 @@ About eight minutes at a normal pace.
 
 > Four things.
 >
-> One, the policy call on the four montage clips. I recommend keeping the strict trade.
+> One, the call on the four fan-edit clips: keep it strict, or take them back along with
+> two wrong answers. I recommend keeping it strict.
 >
 > Two, someone watches the Misfits clip.
 >
-> Three, a direction on the probe. If you want it taken towards the pod as the pre-scan
-> and P0 replacement, I'd start with the plain-views-first version and measure it at the
-> pod's index size.
+> Three, a direction on the probe. If you want it taken towards the pod, as the
+> replacement for the pre-scan and the one-frame probe, my next step would be the
+> normal-views-first version, measured at the pod's index size.
 >
 > And four, still open from last week: keeping the clip_query_hashes rows for voted
 > clips. The clips are still rotting.
 
 ---
 
+
+
 ## If he asks...
 
-**...why not loosen the probe to get the four montages back?**
-> Because I tried the numbers. The four I'd recover and the two wrong ones I'd readmit
-> sit in the same evidence range. There's no bar between them. It's a trade, not a fix.
+**...why not loosen the probe to get the four fan edits back?**
+
+> Because I measured it. The four I'd get back and the two wrong ones I'd let back in
+> sit in the same range of evidence. There's nowhere to put the bar that separates them.
+> So it's a choice between the two, not a fix.
 
 **...whether the mirror views could cause new wrong answers?**
-> That was my worry too, so that was the gate. All 125 real clips, before and after,
-> zero answers changed. It's in the repo if you want the diff.
+
+> That was my worry too, so that was the test I gated it on. All 125 real clips, before
+> and after, zero answers changed. The diff is in the repo if you want it.
 
 **...how long the probe takes now?**
-> About two minutes a clip on my laptop with every view on, against thirty seconds
-> before. Plain-views-first brings ordinary clips back to today's cost.
 
-**...whether the speed edits broke the film-time agreement?**
-> I expected them to and they didn't. The three-second tolerance absorbs a 25 percent
-> speed change. I had a fix designed and threw it away because the measurement said it
-> wasn't needed.
+> About two minutes a clip on my laptop with every view on, against thirty seconds
+> before. Normal-views-first would bring ordinary clips back to today's cost.
+
+**...whether the speed edits broke the film-position agreement?**
+
+> I expected them to, and they didn't. The check has a three-second tolerance and that
+> absorbs a 25 percent speed change. I had a fix designed for it and threw it away,
+> because the measurement said it wasn't needed.
