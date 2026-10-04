@@ -159,7 +159,16 @@ About nine minutes at a normal pace.
 >
 > Most edits barely hurt. Filters, black and white, re-compression, speed changes,
 > nearly everything still gets identified. Two edits made it completely blind, though.
-> The flip: zero out of eight identified. And the black frame: one out of eight.
+> The flip: zero out of eight identified. And the black frame: one out of eight. The
+> table in the document is from after my fixes, which is why it shows eight and six for
+> those two. The before numbers are the zero and the one.
+>
+> The table also shows rotation at one out of eight and zoom at three, and those are a
+> different kind of problem. The flip and the black frame hide a perfect picture that
+> the engine never looks at. Rotation and zoom damage the fingerprint itself, so there's
+> no hidden view to recover. This table is the probe on its own, with its strict bars.
+> In the version with the rules as backup, those clips get a second chance from the
+> rules, which is also the only way the pod itself survives them today.
 >
 > Both turned out to be missing machinery rather than bad thresholds. Nothing anywhere
 > in the engine ever looks at the flipped picture, so a mirrored repost can't match
