@@ -62,6 +62,13 @@
 
 - The one-frame P0 is retired. The rules stay behind it as backup.
 
+**Proof, on real clips. Both pass the OLD pre-scan bar; only the agreement question
+separates them:**
+
+![a wrong answer walked through the bars](output/shots/walk_northman.png)
+
+![a right answer walked through the bars](output/shots/walk_brick.png)
+
 ## 5. Results
 
 **Real clips, all 125:**
