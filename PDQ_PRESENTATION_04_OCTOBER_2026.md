@@ -11,71 +11,152 @@
 
 ---
 
-## 1. What was working before, and how
+## 1. What was working before
 
-The pod's engine, as a verified laptop copy. Three parts can answer, tried in this order:
+The pod's PDQ engine, as an exact laptop copy (verified identical). Three parts can
+produce an answer, and they run in this order:
 
-| part | what it is | how it decides | its results (125 clips) |
-|---|---|---|---|
-| pre-scan | a quick skim before anything else: 40 frames spread across the whole clip | counts hits: 3 frames under distance 28, best under 20. Never asks whether hits agree on film position or come from several clip moments | most answers: 46 correct, but also 4 of the 7 wrong |
-| probe P0 | one quick look at the first 4 seconds, one crop shape only | a single frame under distance 30 is enough to answer | 3 correct, 1 wrong |
-| rules P1-P9 | scorecards per film, watched as the clip is read; first rule to fire wins | the careful mid rules check agreement and clip spread; the weak ones (P8, P9E) mostly count mediocre frames | 3 correct, 2 wrong |
-| all together | quick parts answer first, so the careful checks are rarely reached | counting decides most of the traffic | **52 correct, 7 wrong** |
+1. **The pre-scan.** Before anything else: 40 frames spread across the whole clip, a
+   quick vote. If one film clearly owns those pictures, it answers and nothing else runs.
+2. **The probe (P0).** If the pre-scan didn't answer: after about a second of reading
+   the clip, one quick look - is any single frame close to some film? If yes, answer.
+3. **The rules (P1-P9).** If neither quick part answered: keep reading, build a
+   scorecard per candidate film, rules watch the scorecards, first to fire wins.
 
-## 2. Where the wrong answers came from
+It genuinely was working, mostly: **52 of 125 known clips right, 7 wrong.**
 
-- A true match gives the same offset (film time minus clip time) for every frame.
-  Nothing that decides most of the traffic checks this.
-- All 125 clips run, every answer tagged with the rule that produced it:
+## 2. How it was working, exactly
 
-| rule | wrong answers | distance |
+**The pre-scan's vote**
+
+- a sampled frame is a "hit" on a film if its closest fingerprint is under distance 28
+- a film is accepted on 3 hits with the best under 20
+- never asks whether the hits agree where in the film they land, or whether they came
+  from different parts of the clip
+
+**The probe's test**
+
+- first seconds only, one crop shape, up to 64 fingerprints, one search
+- any single fingerprint under distance 30 -> answer. One frame, from the "probably"
+  band, not the "certain" band
+
+**The rules**
+
+- the scorecard counts matched frames in 3 quality bands, keeps the best distance,
+  and keeps where in the film each hit lands (the offset) and which clip seconds
+  produced it
+- the careful rules use all of it - P4 wants 5 strong frames that agree on film
+  position AND come from 2 different moments of the clip
+- but the rules only ever see the clips the quick parts passed over
+
+## 3. Where the wrong answers came from
+
+All 125 clips run, every answer tagged with the rule that made it:
+
+| part | wrong answers | the clips (brackets = distance) |
 |---|---|---|
-| pre-scan | 4 (Krrish 3, Northman, Civil War, In Between) | 6 - 18 |
-| P0 probe | 1 (Smile) | 26.8 |
-| P9E | 1 (Grave Encounters 2) | 34.0 |
-| P8 | 1 (Demeter) | 41.4 |
+| pre-scan | 4 | Krrish 3 (6), The Northman (6), Civil War (12), The In Between (18) |
+| probe P0 | 1 | Smile (26.8, five frames) |
+| rule P9E | 1 | Grave Encounters 2 (two frames, avg 34) |
+| rule P8 | 1 | Demeter (31 weak frames, avg 41) |
 
 ![attribution printout](output/shots/rules_original.png)
 
-- Four of seven come from the pre-scan, before any rule runs. Rule changes can never
-  reach them. That is why the tech had to change, not the thresholds.
+- Distances 6 to 18 on the pre-scan four: those pictures genuinely are in our library,
+  attached to the wrong film (shared footage). The pre-scan answers before the rules
+  run, so no rule change can ever touch them. The last three rules (P8, P9E, P0) are
+  the ones I tightened in previous weeks.
 
-## 3. What I built
+**So the actual problem:**
 
-| built | how it works | measured result |
-|---|---|---|
-| attribution testing | every clip run records which rule produced the answer | the table above; every change judged by re-running all 125 clips |
-| the probe V2 | 40 frames across the whole clip; each fingerprinted in every view (full, caption-trimmed, all crops, mirrored, bars removed); a scorecard per film with every hit's film position; answers only on the three bars below | on its own: 1 wrong, 41 correct |
-| P0 retired, P9E floor | no more one-frame answers; two frames only count for P9E when the average is 25 or better | removes Smile and Grave Encounters 2 |
-| the edits harness + 2 fixes | 10 reposter edits x 8 clips that work unedited; the probe now fingerprints mirrored views and cuts black bars first | mirror 0/8 to 8/8; letterbox 1/8 to 6/8 |
-| drop-in mode | the probe decides what it trusts; everything it declines falls through to the rules, which read the clip densely | **1 wrong, 48 correct** |
+- The engine knows how to check properly - it just doesn't check where it matters.
+- The good checks exist: *do the matched frames point at the same place in the film?
+  did they come from more than one moment of the clip?* But they are written inside
+  the mid-tier rules (P4, P6a, P7), and the rules only see a clip if the pre-scan and
+  probe both passed on it first. In practice they almost never pass.
+- So most clips get judged by the parts that ask the fewest questions, and the parts
+  that ask the right questions only see the leftovers.
+- Four of the seven wrong answers came through the pre-scan, which never asked whether
+  the hits agreed on film position. They didn't - and that one question would have
+  caught three of them.
 
-## 4. How the probe decides: the three bars
+## 4. What I built
 
-The ladder: the better the pictures, the less agreement demanded.
+**1. Attribution testing** - every clip run records which part of the engine gave the
+answer. Before, a wrong answer was just a number; now it has the name of the rule that
+made it next to it. The table above is its output.
 
-| bar | needs | copied from | impact (of the 41) |
+**2. The rebuilt probe.** It samples 40 frames across the whole clip, like the
+pre-scan. For each sampled frame it fingerprints **every view**:
+
+- A clip's frame is almost never the film frame as fingerprinted: the creator cropped
+  it for a phone screen, zoomed it, TikTok drew captions over it. The film is hiding
+  somewhere inside the frame.
+- So each frame is fingerprinted several ways: the whole frame, the caption-trimmed
+  frame, centre cut-outs in the common shapes at two zoom levels - and, after this
+  week, the mirror of each and the view inside black bars.
+- The old pre-scan never tried the caption-trimmed view; the old probe tried one shape
+  only. They could miss a match purely because of framing. The new probe makes every
+  guess.
+
+Per film it keeps a **scorecard**: distinct frames that hit it, best distance, and for
+every hit the pair (clip time, film time) so it can check the offsets. The old probe
+kept no scorecard at all - it decided on one number. This gives the deciding part the
+scorecard.
+
+It answers in **three situations only**, each copied from a rule the pod already
+trusts. The ladder: the worse the pictures, the more agreement demanded.
+
+| bar | asks | copied from | impact (of its 41 answers) |
 |---|---|---|---|
-| PV-A | 2 near-identical frames | P2.5 | lets in 22 |
-| PV-B | 3 decent frames, best under 20, 2 agreeing on film position | pre-scan + P4 | lets in 17; refuses Northman, Civil War, In Between |
-| PV-C | 5 medium frames, 3 agreeing, from 2 clip moments | P6a | lets in 2 |
+| PV-A | two frames basically identical to the film (under ~12-16)? One can be a fluke, two separate ones can't | P2.5 | 22 answers, e.g. mirrored Magadheera at distance 2 |
+| PV-B | a few decent frames (3 under 28, best under 20 - exactly the old pre-scan bar) AND two agreeing where in the film they sit? (that agreement is P4's check) | pre-scan + P4 | 17 answers; refuses Northman, Civil War, In Between |
+| PV-C | only mediocre frames (5 under 33)? then prove it twice: 3 agreeing on film position, from 2 different clip moments | P6a | 2 answers (heavily filtered clips) |
 
-**Proof, on real clips. Both pass the OLD pre-scan bar; only the agreement question
-separates them:**
+And the old probe's question - "is there one frame under 30?" - **no longer exists**.
+That question is how Smile got wrongly answered; Smile now fails all three bars (best
+frame 22: not identical, not under 20) and the probe stays quiet.
 
-![a wrong answer walked through the bars](output/shots/walk_northman.png)
+## 5. The probe on real clips (real printouts, rerunnable)
+
+**A right answer - the Brick clip.** 13 frames hit Brick, best distance 8, and three
+hits land at film minute 19.1 with the same offset. PV-B: decent frames, two agreeing
+-> PASS. Answer: Brick.
 
 ![a right answer walked through the bars](output/shots/walk_brick.png)
 
-**And the honest third case: a true scene with thin evidence. Perfect agreement
-(every offset 32.2) but too few frames, so the probe declines - and the fallback
-rules then name Soul via P1. Declined is not lost:**
+**The look-alike - the Northman clip.** One frame at distance 6 (the shared footage),
+others at 16-44, but the offsets scatter: minutes 37, 40, 43, 49. No two agree. PV-A:
+only one near-perfect frame, fail. PV-B: decent count, agreement of one, fail. PV-C:
+fail. The probe stays quiet.
+
+![a wrong answer walked through the bars](output/shots/walk_northman.png)
+
+**Both clips pass the old pre-scan's bar.** On "count and best" they are
+indistinguishable - that is exactly how Northman got wrongly answered. The agreement
+question is the only thing that separates them.
+
+**The honest third case - the Soul clip.** Five hits, all agreeing perfectly (every
+offset 32.2 minutes - a true scene's signature), but only two frames under 28 because
+the film occupies just the first seconds of the clip. Thin evidence, so the probe
+declines - and the fallback rules read the clip densely and name Soul via P1.
+Declined is not lost.
 
 ![a true scene the probe hands to the rules](output/shots/walk_soul.png)
 
-## 5. Results
+**The two cases that remain, and why:**
 
-**Real clips, all 125:**
+- **Krrish 3, the one wrong answer left.** Its pictures match at distance 6 AND agree
+  on film position - every test we have says genuine, because those exact frames
+  really are in our library under Krrish 3 (reused footage). When pictures say yes in
+  every way pictures can, only a different kind of evidence can say no: audio, SSCD.
+- **The four lost correct answers - fan edits.** A fan edit cuts together moments of
+  one film, so its hits genuinely scatter - which is exactly what the Northman case
+  looks like. Same evidence shape, opposite truth. No setting keeps the four and
+  blocks the two, so it is a choice of which mistake to prefer. Per "a no answer
+  beats a wrong one" I chose strict - that call is the policy question I'm bringing.
+
+## 6. Results
 
 | engine | wrong | correct |
 |---|---|---|
@@ -85,10 +166,7 @@ rules then name Soul via P1. Declined is not lost:**
 
 ![measured](output/shots/rules_probev2.png)
 
-- The 1 left: Krrish 3, distance 6, identical pictures. Needs audio / SSCD.
-- The 4 lost: fan edits that jump scenes. Recovering them readmits 2 wrongs. Kept strict.
-
-**Edited clips:**
+**Edited clips** (10 reposter edits x 8 clips that work unedited):
 
 ![the two blinding edits](output/shots/edit_examples.png)
 
