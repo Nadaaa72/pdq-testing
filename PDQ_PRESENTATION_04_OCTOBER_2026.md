@@ -106,6 +106,44 @@ rules then name Soul via P1. Declined is not lost:**
 
 ---
 
+## The whole story in three tables
+
+**Before: what was working, and how**
+
+| part | what it is | how it decides | its results (125 clips) |
+|---|---|---|---|
+| pre-scan | a quick skim before anything else: 40 frames spread across the whole clip | counts hits: 3 frames under distance 28, best under 20. Never asks whether hits agree on film position or come from several clip moments | most answers: 46 correct, but also 4 of the 7 wrong (Krrish 3, Northman, Civil War, In Between, at distances 6-18) |
+| probe P0 | one quick look at the first 4 seconds, one crop shape only | a single frame under distance 30 is enough to answer | 3 correct, 1 wrong (Smile, answered off one frame) |
+| rules P1-P9 | scorecards per film, watched as the clip is read; first rule to fire wins | the careful mid rules check agreement and clip spread; the weak ones (P8, P9E) mostly count mediocre frames | 3 correct, 2 wrong (Demeter via P8, Grave Encounters 2 via P9E) |
+| all together | quick parts answer first, so the careful checks are rarely reached | counting decides most of the traffic | **52 correct, 7 wrong** |
+
+**After: what I built, and how it works**
+
+| built | how it works | measured result |
+|---|---|---|
+| attribution testing | every clip run records which rule produced the answer | each of the 7 wrong answers pinned to its rule; every later change judged by re-running all 125 clips |
+| the probe V2 | 40 frames across the whole clip; each fingerprinted in every view (full, caption-trimmed, all crops, mirrored, bars removed); a scorecard per film with every hit's film position | on its own: 1 wrong, 41 correct |
+| bar PV-A (from P2.5) | two near-identical frames, under ~distance 12-16 | lets in 22 of the 41 |
+| bar PV-B (pre-scan + P4) | three decent frames, best under 20, AND two agreeing on film position | lets in 17; refuses Northman, Civil War, In Between |
+| bar PV-C (from P6a) | five medium frames, three agreeing, from two clip moments | lets in 2 (heavily filtered clips) |
+| P0 retired, P9E floor | no more one-frame answers; two frames only count for P9E when the average is 25 or better | removes Smile and Grave Encounters 2 |
+| the edits harness + 2 fixes | 10 reposter edits x 8 clips; probe now fingerprints mirrored views and cuts black bars first | mirror 0/8 to 8/8 (distance 2); letterbox 1/8 to 6/8; zero changes on real clips |
+| drop-in mode | the probe decides what it trusts; everything it declines falls through to the rules, which read the clip densely | **1 wrong, 48 correct** |
+
+**Before against after**
+
+| | before | after |
+|---|---|---|
+| wrong answers | 7 | **1** (Krrish 3: identical pictures, needs audio/SSCD) |
+| correct answers | 52 | 48 (the 4 lost are fan edits - the policy question) |
+| agreement checked where most decisions happen | no | yes |
+| minimum evidence for an answer | 1 frame | 2 near-identical frames |
+| mirrored clips identified | 0 of 8 | **8 of 8** |
+| letterboxed clips identified | 1 of 8 | **6 of 8** |
+| wrong films caused by edits | 0 | 0 |
+| every answer names its rule | no | yes |
+| probe cost per clip | ~30 s | ~2 min (normal-views-first restores it) |
+
 ## The asks
 
 1. Policy call: the 4 fan-edit clips. I recommend staying strict.
