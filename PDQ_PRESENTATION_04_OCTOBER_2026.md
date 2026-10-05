@@ -69,6 +69,12 @@ separates them:**
 
 ![a right answer walked through the bars](output/shots/walk_brick.png)
 
+**And the honest third case: a true scene with thin evidence. Perfect agreement
+(every offset 32.2) but too few frames, so the probe declines - and the fallback
+rules then name Soul via P1. Declined is not lost:**
+
+![a true scene the probe hands to the rules](output/shots/walk_soul.png)
+
 ## 5. Results
 
 **Real clips, all 125:**
