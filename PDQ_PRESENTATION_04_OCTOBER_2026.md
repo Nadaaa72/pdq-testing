@@ -11,24 +11,22 @@
 
 ---
 
-## 1. What was working before
+## 1. What was working before, and how
 
-- The pod's engine, as an exact laptop copy. 52 of 125 known clips right, 7 wrong.
-- Three parts can answer, in order: pre-scan, probe (P0), then the rules.
+The pod's engine, as a verified laptop copy. Three parts can answer, tried in this order:
 
-| decider | evidence it needs | checks offsets? | share of answers |
+| part | what it is | how it decides | its results (125 clips) |
 |---|---|---|---|
-| pre-scan | 3 frames, best under 20 | no | most |
-| probe P0 | 1 frame under 30 | no | some |
-| rules P1-P9 | 1 to 30 frames by rule | only the mid rules | the rest |
+| pre-scan | a quick skim before anything else: 40 frames spread across the whole clip | counts hits: 3 frames under distance 28, best under 20. Never asks whether hits agree on film position or come from several clip moments | most answers: 46 correct, but also 4 of the 7 wrong |
+| probe P0 | one quick look at the first 4 seconds, one crop shape only | a single frame under distance 30 is enough to answer | 3 correct, 1 wrong |
+| rules P1-P9 | scorecards per film, watched as the clip is read; first rule to fire wins | the careful mid rules check agreement and clip spread; the weak ones (P8, P9E) mostly count mediocre frames | 3 correct, 2 wrong |
+| all together | quick parts answer first, so the careful checks are rarely reached | counting decides most of the traffic | **52 correct, 7 wrong** |
 
-## 2. How it was working
+## 2. Where the wrong answers came from
 
-- The quick parts decide most clips on counting alone. The careful checks sit in rules
-  that rarely decide.
 - A true match gives the same offset (film time minus clip time) for every frame.
   Nothing that decides most of the traffic checks this.
-- Every answer now records the rule that made it. The seven wrong answers:
+- All 125 clips run, every answer tagged with the rule that produced it:
 
 | rule | wrong answers | distance |
 |---|---|---|
@@ -39,28 +37,28 @@
 
 ![attribution printout](output/shots/rules_original.png)
 
-- Four of seven come from the pre-scan. Rule changes can never reach them.
+- Four of seven come from the pre-scan, before any rule runs. Rule changes can never
+  reach them. That is why the tech had to change, not the thresholds.
 
 ## 3. What I built
 
-- **Attribution testing**: every answer tagged with the rule that produced it.
-- **A rebuilt probe**: whole-clip view + the careful checks, as one decider.
-- **An edits test**: 10 reposter edits x 8 clips that work unedited.
-- **Two fixes**: mirrored views, and cutting black bars before fingerprinting.
-
-## 4. How the new probe works
-
-- Samples 40 frames across the whole clip; keeps a scorecard per film: frames, best
-  distance, and every hit's (clip time, film time) pair.
-- Answers only when the evidence agrees like a real scene does:
-
-| bar | needs | copied from |
+| built | how it works | measured result |
 |---|---|---|
-| PV-A | 2 near-identical frames | P2.5 |
-| PV-B | 3 frames, best under 20, 2 agreeing on offset | pre-scan + P4 |
-| PV-C | 5 medium frames agreeing, from 2 clip moments | P6a |
+| attribution testing | every clip run records which rule produced the answer | the table above; every change judged by re-running all 125 clips |
+| the probe V2 | 40 frames across the whole clip; each fingerprinted in every view (full, caption-trimmed, all crops, mirrored, bars removed); a scorecard per film with every hit's film position; answers only on the three bars below | on its own: 1 wrong, 41 correct |
+| P0 retired, P9E floor | no more one-frame answers; two frames only count for P9E when the average is 25 or better | removes Smile and Grave Encounters 2 |
+| the edits harness + 2 fixes | 10 reposter edits x 8 clips that work unedited; the probe now fingerprints mirrored views and cuts black bars first | mirror 0/8 to 8/8; letterbox 1/8 to 6/8 |
+| drop-in mode | the probe decides what it trusts; everything it declines falls through to the rules, which read the clip densely | **1 wrong, 48 correct** |
 
-- The one-frame P0 is retired. The rules stay behind it as backup.
+## 4. How the probe decides: the three bars
+
+The ladder: the better the pictures, the less agreement demanded.
+
+| bar | needs | copied from | impact (of the 41) |
+|---|---|---|---|
+| PV-A | 2 near-identical frames | P2.5 | lets in 22 |
+| PV-B | 3 decent frames, best under 20, 2 agreeing on film position | pre-scan + P4 | lets in 17; refuses Northman, Civil War, In Between |
+| PV-C | 5 medium frames, 3 agreeing, from 2 clip moments | P6a | lets in 2 |
 
 **Proof, on real clips. Both pass the OLD pre-scan bar; only the agreement question
 separates them:**
@@ -102,35 +100,8 @@ rules then name Soul via P1. Declined is not lost:**
 
 - No edit ever produced a wrong film, on any version. Edits silence, never fool.
 - Safety gate: all 125 real clips re-run with the fixes. Zero answers changed.
-- Cost: probe 4x slower with extra views. Pod shape: normal views first.
 
----
-
-## The whole story in three tables
-
-**Before: what was working, and how**
-
-| part | what it is | how it decides | its results (125 clips) |
-|---|---|---|---|
-| pre-scan | a quick skim before anything else: 40 frames spread across the whole clip | counts hits: 3 frames under distance 28, best under 20. Never asks whether hits agree on film position or come from several clip moments | most answers: 46 correct, but also 4 of the 7 wrong (Krrish 3, Northman, Civil War, In Between, at distances 6-18) |
-| probe P0 | one quick look at the first 4 seconds, one crop shape only | a single frame under distance 30 is enough to answer | 3 correct, 1 wrong (Smile, answered off one frame) |
-| rules P1-P9 | scorecards per film, watched as the clip is read; first rule to fire wins | the careful mid rules check agreement and clip spread; the weak ones (P8, P9E) mostly count mediocre frames | 3 correct, 2 wrong (Demeter via P8, Grave Encounters 2 via P9E) |
-| all together | quick parts answer first, so the careful checks are rarely reached | counting decides most of the traffic | **52 correct, 7 wrong** |
-
-**After: what I built, and how it works**
-
-| built | how it works | measured result |
-|---|---|---|
-| attribution testing | every clip run records which rule produced the answer | each of the 7 wrong answers pinned to its rule; every later change judged by re-running all 125 clips |
-| the probe V2 | 40 frames across the whole clip; each fingerprinted in every view (full, caption-trimmed, all crops, mirrored, bars removed); a scorecard per film with every hit's film position | on its own: 1 wrong, 41 correct |
-| bar PV-A (from P2.5) | two near-identical frames, under ~distance 12-16 | lets in 22 of the 41 |
-| bar PV-B (pre-scan + P4) | three decent frames, best under 20, AND two agreeing on film position | lets in 17; refuses Northman, Civil War, In Between |
-| bar PV-C (from P6a) | five medium frames, three agreeing, from two clip moments | lets in 2 (heavily filtered clips) |
-| P0 retired, P9E floor | no more one-frame answers; two frames only count for P9E when the average is 25 or better | removes Smile and Grave Encounters 2 |
-| the edits harness + 2 fixes | 10 reposter edits x 8 clips; probe now fingerprints mirrored views and cuts black bars first | mirror 0/8 to 8/8 (distance 2); letterbox 1/8 to 6/8; zero changes on real clips |
-| drop-in mode | the probe decides what it trusts; everything it declines falls through to the rules, which read the clip densely | **1 wrong, 48 correct** |
-
-**Before against after**
+**The week, before against after:**
 
 | | before | after |
 |---|---|---|
