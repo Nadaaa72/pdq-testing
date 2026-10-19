@@ -4,10 +4,15 @@ probe_walkthrough.py - walk one clip through the probe's three bars, showing the
 
     python probe_walkthrough.py data\clips\<clip> "Northman"
 
-Collects exactly the evidence the probe V2 collects (same sampling, same views, same
-per-film scorecard), then evaluates PV-A, PV-B and PV-C on the named film and prints
-each bar's question, the actual numbers, and PASS or FAIL. This is the demonstration
-of WHY a clip is accepted or refused, using the engine's real evidence.
+Collects exactly the evidence the probe V2 collects - through the engine's own ProbeRun,
+so it cannot drift from it - then evaluates PV-A, PV-B and PV-C on the named film and
+prints each bar's question, the actual numbers, and PASS or FAIL. This is the
+demonstration of WHY a clip is accepted or refused, using the engine's real evidence.
+
+It also shows WHEN: the probe samples in waves and judges after each one, so the table of
+waves says how much of the clip it had to look at before the answer was settled. Unlike
+the engine, this walks every wave to the end even once a bar has fired, because the point
+here is to show the whole picture rather than to stop early.
 """
 from __future__ import annotations
 
@@ -15,7 +20,6 @@ import argparse
 import importlib.util
 import io
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -26,69 +30,40 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("clip")
     ap.add_argument("film", help="part of the film's name, e.g. Northman")
+    ap.add_argument("--maxdim", type=int, default=None,
+                    help="shrink each frame to this before hashing, as the engine can "
+                         "(640 is the size the index was built at)")
     a = ap.parse_args()
 
     spec = importlib.util.spec_from_file_location("eng", HERE / "pdq_engine_PROBEV2.py")
     E = importlib.util.module_from_spec(spec)
     sys.modules["eng"] = E
     spec.loader.exec_module(E)
-    import cv2
-    import numpy as np
-
     index = E.load_index(str(HERE / "data" / "index"))
     w, h, dur = E.video_wh_duration(a.clip)
     qgroup = E.infer_query_group_from_wh(w, h)
     groups = [g for g in E.groups_for_clip_shape(qgroup) if g in index.index_by_group]
 
-    # ---- collect the probe's evidence, exactly as super_probe does -----------------------
-    cap = cv2.VideoCapture(a.clip)
-    samples = {g: [] for g in groups}
-    for i in range(E.PV2_SAMPLES):
-        t = dur * (i + 0.5) / E.PV2_SAMPLES
-        cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
-        ok, bgr = cap.read()
-        if not ok or bgr is None:
-            continue
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-        views = [rgb]
-        region = E.active_region(rgb)
-        if region is not None:
-            views.append(region)
-        views += [np.ascontiguousarray(v[:, ::-1]) for v in list(views)]
-        for vi, v in enumerate(views):
-            targets = []
-            if "FULL" in groups:
-                targets.append(("FULL", v))
-                if vi == 0:
-                    sv = E.safe_trim_view(v)
-                    if sv is not None:
-                        targets.append(("FULL", sv))
-            for c in E.CROPS:
-                g = E.group_for_crop_name(c.name)
-                if g in groups:
-                    targets.append((g, E.center_crop_aspect(v, c.ar_w, c.ar_h, c.scale)))
-            for g, img in targets:
-                hb, q = E.pdq_hash(img)
-                if q >= E.CLIP_QUALITY_MIN:
-                    samples[g].append((i, t, hb))
-    cap.release()
-
-    film_hits: dict = defaultdict(dict)
-    for g, sl in samples.items():
-        if not sl:
-            continue
-        xq = np.frombuffer(b"".join(hb for _, _, hb in sl), dtype=np.uint8).reshape(-1, 32)
-        D, I = index.index_by_group[g].search(xq, E.K_PER_HASH)
-        for row in range(D.shape[0]):
-            si, ct, _ = sl[row]
-            for col in range(D.shape[1]):
-                d = int(D[row, col]); nn = int(I[row, col])
-                if nn < 0 or d >= E.MAX_HAMMING:
-                    continue
-                v = int(index.meta_vid[g][nn])
-                cur = film_hits[v].get(si)
-                if cur is None or d < cur[0]:
-                    film_hits[v][si] = (d, ct, float(index.meta_ts[g][nn]))
+    # ---- collect the probe's evidence, through the engine's own ProbeRun ------------------
+    # This used to be a third copy of the sampling loop, and it had already drifted: it never
+    # applied maxdim, and it rebuilt the view list by hand. Going through ProbeRun means the
+    # walkthrough can only ever show what the engine really does.
+    run = E.ProbeRun(a.clip, index, groups, maxdim=a.maxdim)
+    if not run.ok:
+        print("that clip is unreadable, or 2 seconds or shorter - the probe skips it")
+        return 0
+    first_wave: dict = {}        # vidx -> the wave its evidence first showed up on
+    wave_log = []                # [(wave, frames so far, the probe's verdict at that point)]
+    try:
+        for wi, idxs in enumerate(run.schedule(), 1):
+            run.extend(idxs)
+            for v in run.film_hits:
+                first_wave.setdefault(v, wi)
+            hit, _ = E.pv2_decide(run.film_hits)
+            wave_log.append((wi, len(run.consumed), hit))
+    finally:
+        run.close()
+    film_hits = run.film_hits
 
     target = next((v for v in film_hits if a.film.lower() in index.label(v).lower()), None)
     if target is None:
@@ -98,6 +73,19 @@ def main() -> int:
     rows = sorted(film_hits[target].values())
     print(f"clip: {Path(a.clip).name}")
     print(f"film examined: {index.label(target)}")
+    print(f"\nTHE WAVES (the probe judges after each one, and stops as soon as it can):")
+    print(f"  {'wave':>4}   {'frames':>6}   verdict at that point")
+    for wi, nf, hit in wave_log:
+        said = f"{index.label(hit['vidx'])} on {hit['tier']}" if hit else "stays quiet"
+        print(f"  {wi:>4}   {nf:>6}   {said}")
+    fired = next((w for w, _, h in wave_log if h), None)
+    if fired:
+        settled = next(nf for w, nf, h in wave_log if w == fired)
+        print(f"  -> settled on wave {fired}, having looked at {settled} of "
+              f"{run.n_samples} sampled frames")
+    else:
+        print(f"  -> never settled; all {run.n_samples} frames looked at, the rules take over")
+    print(f"\nthis film's evidence first appeared on wave {first_wave.get(target, '-')}")
     print(f"\nTHE PROBE'S EVIDENCE for this film ({len(rows)} sampled frames hit it):")
     print(f"  {'clip time':>9}   {'film time':>9}   {'distance':>8}   {'offset':>9}")
     for d, ct, ft in rows:

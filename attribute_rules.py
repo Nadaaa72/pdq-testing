@@ -35,9 +35,28 @@ HERE = Path(__file__).resolve().parent
 CLIPS = HERE / "data" / "clips"
 OUT = HERE / "output"
 
+# best_hint keeps its exact old shape, because metrics.parse_hint reads it with a regex.
+# The scorecard columns are new and go at the END, so an older CSV still reads back.
+#   hint_band   the top candidate's band: strong, medium or weak (see pv2_scorecard)
+#   hint_views  which of the probe's pictures found it, e.g. "SQUARE:p,SQUARE:x"
+#   hint_short  what it was short of, e.g. "PV-B needs 1 more frame under 28"
+#   scorecard   the top three candidates packed as label~band~frames~best~avg~aligned~
+#               clusters~biggest~moments~views~shortfall, separated by ";"
 FIELDS = ["list", "clip", "expected_film", "in_catalogue", "answered_film", "reproduced",
           "stage", "rule", "reason", "exit_kind", "frames", "avg_hamming", "wait_s",
-          "duration_s", "query_s", "best_hint"]
+          "duration_s", "query_s", "best_hint",
+          "hint_band", "hint_views", "hint_short", "scorecard"]
+
+
+def _scorecard_cells(E, index, r) -> dict:
+    """The hint bucket's columns. Empty when the engine predates pv2_scorecard, so an older
+    engine can still be measured with this harness."""
+    card = getattr(r, "scorecard", None) or []
+    if not card or not hasattr(E, "pv2_scorecard_str"):
+        return {"hint_band": "", "hint_views": "", "hint_short": "", "scorecard": ""}
+    top = card[0]
+    return {"hint_band": top["band"], "hint_views": top["views"],
+            "hint_short": top["shortfall"], "scorecard": E.pv2_scorecard_str(card, index)}
 
 
 def load_engine(path: Path):
@@ -81,6 +100,13 @@ def stage_and_rule(reason: str, exit_kind: str) -> tuple[str, str]:
     head = re.split(r"[:(]", reason)[0].strip()
     if head.startswith("SCAN"):
         return "pre-scan", "SCAN"
+    # The probe now carries rules ported from the streaming set, so a reason can read
+    # "P1: probe-v2 ..." or "P3.5: probe-v2 ...". Those are PROBE answers, not streaming
+    # ones, and attributing them to the streaming pass would credit the wrong stage with
+    # them - which is the whole point of this file. The probe stamps "probe-v2" into every
+    # reason it writes, so trust that over the rule name.
+    if "probe-v2" in reason:
+        return "probe-v2", head
     if head.startswith("PV-"):
         return "probe-v2", head
     if head == "P0":
@@ -95,8 +121,17 @@ def main() -> int:
     ap.add_argument("--engine", default="pdq_engine.py", help="which engine file to test")
     ap.add_argument("--list", choices=["wrong", "correct", "both"], default="both")
     ap.add_argument("--no-prescan", action="store_true", help="pre-scan off, the rules decide")
+    ap.add_argument("--probe-only", action="store_true",
+                    help="the probe is the entire engine: no streaming pass, no P1-P9")
     ap.add_argument("--tag", default="", help="extra tag for the output file name")
     a = ap.parse_args()
+
+    # test_edits.py has always had this flag; here it had to be set by hand in the
+    # environment, which is easy to forget and silently measures the wrong engine.
+    if a.probe_only:
+        os.environ["PDQ_PROBE_ONLY"] = "1"
+        if not a.tag:
+            a.tag = "probeonly"
 
     engine_path = HERE / a.engine
     if not engine_path.is_file():
@@ -163,6 +198,7 @@ def main() -> int:
             "avg_hamming": (f"{st['avg_ham']:.1f}" if st else ""),
             "wait_s": f"{r.wait_seconds:.0f}", "duration_s": f"{r.duration_s:.0f}",
             "query_s": f"{r.query_seconds:.1f}", "best_hint": best_hint,
+            **_scorecard_cells(E, index, r),
         })
         fh.flush()
         mark = "ANSWERED" if r.early_accept else "no answer"

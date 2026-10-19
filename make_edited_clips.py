@@ -47,8 +47,12 @@ EDITS: dict[str, list[str]] = {
     # what the offset-agreement checks assume is fixed.
     "speed125":  ["-vf", "setpts=PTS/1.25"],
     "speed080":  ["-vf", "setpts=PTS/0.8"],
-    # zoom in 20%: crops the edges away, keeps the middle
-    "zoom120":   ["-vf", "crop=iw/1.2:ih/1.2,scale=iw*1.2:ih*1.2"],
+    # zoom in 20%: crops the edges away, keeps the middle.
+    # The sizes are rounded DOWN TO EVEN because h.264 cannot encode an odd dimension:
+    # a 1535-wide source cropped by 1.2 and scaled back lands on 1279, and ffmpeg fails
+    # with "width not divisible by 2", leaving a zero-byte file behind.
+    "zoom120":   ["-vf", "crop=iw/1.2:ih/1.2,"
+                         "scale=trunc(iw*1.2/2)*2:trunc(ih*1.2/2)*2"],
     # a colour filter, like an Instagram filter over the whole clip
     "filter":    ["-vf", "eq=saturation=1.6:contrast=1.15:brightness=0.06"],
     # black and white

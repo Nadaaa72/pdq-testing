@@ -19,7 +19,9 @@ If a link fails, save the clip any other way and give the file.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import io
+import os
 import re
 import sys
 import time
@@ -68,9 +70,29 @@ def main() -> int:
     ap.add_argument("--quiet", action="store_true", help="print only the verdict")
     ap.add_argument("--index", help="use this index folder instead of INDEX_DIR at the top of the file")
     ap.add_argument("--cookies", metavar="FILE", help="a cookies.txt for yt-dlp, for links that need a login")
+    ap.add_argument("--engine", default="pdq_engine.py",
+                    help="which engine file to run, e.g. pdq_engine_PROBEV2.py. The default is "
+                         "the live one, which still has the pre-scan and P0")
+    ap.add_argument("--probe-only", action="store_true",
+                    help="the probe is the entire engine: no streaming pass, no P1-P9")
     a = ap.parse_args()
 
-    import pdq_engine as E
+    # Which engine actually runs. Without this flag the CLI and app.py could only ever run
+    # pdq_engine.py, so the engine being measured by attribute_rules.py was unreachable from
+    # here and a demo showed different behaviour from the results table.
+    if a.probe_only:
+        os.environ["PDQ_PROBE_ONLY"] = "1"
+    if a.engine in ("pdq_engine.py", "pdq_engine"):
+        import pdq_engine as E
+    else:
+        engine_path = Path(__file__).resolve().parent / a.engine
+        if not engine_path.is_file():
+            raise SystemExit(f"no such engine: {engine_path}")
+        spec = importlib.util.spec_from_file_location("engine_under_test", engine_path)
+        E = importlib.util.module_from_spec(spec)
+        sys.modules["engine_under_test"] = E
+        spec.loader.exec_module(E)
+        print(f"engine: {engine_path.name}" + ("   (probe only)" if a.probe_only else ""))
     index_dir = Path(a.index) if a.index else INDEX_DIR
     if not (index_dir / "manifest.json").is_file():
         raise SystemExit(f"no index at {index_dir}. Run  python 2_build_index.py  first, or fix INDEX_DIR at the top of this file.")

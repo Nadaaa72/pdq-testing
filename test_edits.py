@@ -28,11 +28,14 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from attribute_rules import load_engine, film_matches, stage_and_rule  # noqa: E402
+from attribute_rules import (load_engine, film_matches, stage_and_rule,  # noqa: E402
+                             _scorecard_cells)
 
 OUT = HERE / "output"
 FIELDS = ["clip", "film", "edit", "unedited_rule", "answered_film", "verdict",
-          "stage", "rule", "reason", "exit_kind", "query_s"]
+          "stage", "rule", "reason", "exit_kind", "query_s",
+          # the hint bucket - see pv2_scorecard in the engine, and attribute_rules.FIELDS
+          "hint_band", "hint_views", "hint_short", "scorecard"]
 
 
 def main() -> int:
@@ -101,7 +104,8 @@ def main() -> int:
                     "unedited_rule": job["unedited_rule"], "answered_film": r.label or "",
                     "verdict": verdict, "stage": stage, "rule": rule,
                     "reason": r.reason or r.exit_reason, "exit_kind": r.exit_kind,
-                    "query_s": f"{r.query_seconds:.1f}"})
+                    "query_s": f"{r.query_seconds:.1f}",
+                    **_scorecard_cells(E, index, r)})
         fh.flush()
         print(f"[{i}/{len(jobs)}] {job['edit']:10} {job['film'][:26]:28} {verdict:11} {rule:10} {r.query_seconds:5.1f}s")
     fh.close()

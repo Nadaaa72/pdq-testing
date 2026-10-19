@@ -151,7 +151,20 @@ QUALITY_MIN_FLOOR = 30     # if the probe found no fingerprint at all, the quali
 # This probe keeps the pre-scan's whole-clip view and adds the checks the full system has
 # and they never did: per-film evidence, film-time agreement (every true match gives the
 # same offset), and spread across the clip. Its rulebook mirrors the trusted rules.
-PV2_SAMPLES = 40            # frames sampled evenly across the whole clip (same as the pre-scan)
+# How many frames to sample. Settable so the sample size can be measured rather than
+# assumed: PDQ_PROBE_SAMPLES=50 reads 50 frames instead of 40. The wave schedule below
+# scales with it, so the early waves stay the same size and the extra frames land in the
+# last wave, where only the clips that need them ever pay for them.
+# 80, not 40, since 17 Oct 2026. Measured on two independent sets: on the 125 real clips
+# 51 right / 1 wrong against 40's 46 / 1, and on the 77 held-out clips 17 of 40 against 11.
+# Ten clips gained and six gained, none lost either time, and no new wrong answers. The cost
+# is about half again as much stage-1 time on the whole set (17.5 min against 11.3), though
+# the median clip barely moves because the waves still stop it at 8 frames.
+#
+# This is only a fair comparison BECAUSE of the nested sampling below: the 80 moments
+# contain all 40 of the 40-sample moments, so 80 can only add. Raising the count on the old
+# grid relocates every sample instead, and that measures nothing - see pv2_waves.
+PV2_SAMPLES = int(os.environ.get("PDQ_PROBE_SAMPLES", "80"))
 PV2_OFFSET_TOL_S = 3.0      # two hits "agree" on film time if their offsets sit within 3 s
 PV2_SPREAD_S = 3.0          # clip moments count as different if 3 s apart (same as P4)
 PV2_A_BEST, PV2_A_DIST, PV2_A_FRAMES = 12.0, 16.0, 2   # PV-A (like P2.5): 2 near-perfect frames
@@ -159,6 +172,200 @@ PV2_B_BEST, PV2_B_DIST, PV2_B_FRAMES = 20.0, 28.0, 3   # PV-B (the old pre-scan 
 PV2_B_NEED_ALIGN = 2                                   # ... but 2 hits must now agree on film time
 PV2_C_BEST, PV2_C_DIST, PV2_C_FRAMES = 26.0, 33.0, 5   # PV-C (like P6a): medium frames ...
 PV2_C_NEED_ALIGN, PV2_C_NEED_SPREAD = 3, 2             # ... 3 agreeing, from 2 clip moments
+# Three more bars, ported into the probe and measured over all 125 real clips with
+# replay_rules.py. Together they take the probe alone from 42 right / 1 wrong to
+# 47 right / 1 wrong, with precision unchanged at 97.9%.
+#
+# P1 is the streaming rules' most common exit: one frame under 15 plus two others. Ported
+# UNCHANGED it readmits The Northman - one distance-6 frame of shared footage and five
+# scattered hits - which is the exact wrong answer this probe exists to refuse. So it gets
+# the agreement check the probe's own bars have, and that check is measured only over hits
+# under PV2_P1_DIST: unbanded, Northman's two junk hits at distances 30 and 44 corroborate
+# each other and it gets back in.
+PV2_P1_BEST, PV2_P1_FRAMES = 15.0, 3
+PV2_P1_ALIGN, PV2_P1_DIST = 2, 28.0
+# PV-E, the cut rule: a fan edit cuts between moments of one film, so it produces SEVERAL
+# film-time clusters that each corroborate internally, where a look-alike produces isolated
+# singletons. PV2_E_PER_CLUSTER is the whole rule - at 1 it stops meaning corroboration and
+# lets The Northman in; at 2 it recovers real edits only.
+PV2_E_CLUSTERS, PV2_E_PER_CLUSTER, PV2_E_BEST = 2, 2, 33.0
+# P3.5: nothing else in the index matched at all, so the bar drops. Careful on a small
+# index - with 134 films a sole candidate is common, with the pod's 9,500 it is rare.
+PV2_P35_BARS = ((20.0, 4), (30.0, 7), (35.0, 12), (45.0, 20))
+# Collect the plain views first and the mirrored / letterbox-trimmed views only if the plain
+# ones did not answer. Recall-identical by construction (see super_probe), ~2x cheaper on
+# every clip the probe accepts. Off by default until measured over all 125 clips.
+PV2_TWO_STAGE = os.environ.get("PDQ_PROBE_TWO_STAGE") == "1"
+# The second round: when nothing passes but some film is in the running, sample again densely
+# around the moments that already matched, searching ONLY the shortlisted films. Measured, one
+# film searches 63x faster than the whole 134-film index (0.024 s vs 1.504 s for 300 queries),
+# and that cost does not grow with the catalogue. Off by default until measured end to end.
+PV2_RESAMPLE = os.environ.get("PDQ_PROBE_RESAMPLE") == "1"
+PV2_SHORTLIST = 20          # how many candidate films the second round may look at
+# --- the wave schedule: stop paying for evidence the answer no longer needs ---------------
+# The probe used to be all-or-nothing: all 40 seeks and every hash before anyone looked at a
+# single result, even when sample one was a perfect match and even when the clip is not in the
+# catalogue at all. Measured over the 125 real clips, that is a 10.9 s median, 46.6 s at p90
+# and 242.5 s at worst - 40.5 minutes for the set, and not one clip under a second.
+#
+# So the samples are taken in WAVES instead, and the probe judges after each one. It accepts
+# as soon as a bar fires, and gives up while the whole run has still found nothing. Measured
+# with replay_rules.py against the saved evidence of all 125 clips, that is
+# DECISION-IDENTICAL to the full scan - 47 right, 1 wrong, the same film on all 48 answers -
+# at 49% of the sampled frames. Cutting frames any other way does not survive: flat
+# decimation to 20 evenly spread samples drops 47 right to 31, because the bars reward hits
+# that agree on a film-time offset and thinning the samples destroys the agreement.
+#
+# Reproduce or re-measure any of this in a second, without decoding a frame:
+#   python replay_rules.py --rules adopted --waves 8,16,24,40 --bar run --audit-waves --cost
+try:
+    from pv2_waves import (sample_order as _wave_order, wave_bounds as _wave_bounds,
+                           anchored_fractions as _anchored_fractions,
+                           nested_fractions as _nested_fractions,
+                           nested_order as _nested_order)
+except ModuleNotFoundError:
+    # Loaded by a harness that lives somewhere else, so this folder is not on the path.
+    # dump_probe_evidence.py, attribute_rules.py and app.py all load this file by path, and
+    # a test script can sit anywhere, so find our neighbour rather than depend on the caller.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from pv2_waves import (sample_order as _wave_order, wave_bounds as _wave_bounds,
+                           anchored_fractions as _anchored_fractions,
+                           nested_fractions as _nested_fractions,
+                           nested_order as _nested_order)
+PV2_WAVES = (8, 16, 24, 40)          # cumulative sample counts, tuned at PV2_SAMPLES=40
+PV2_PROGRESSIVE = os.environ.get("PDQ_PROBE_PROGRESSIVE", "1") == "1"
+PV2_WAVE_ORDER = os.environ.get("PDQ_PROBE_WAVE_ORDER", "vdc")      # vdc | golden | linear
+PV2_WAVE_BAR = os.environ.get("PDQ_PROBE_WAVE_BAR", "run")          # run | wave | off
+# How many frames must be looked at before "nothing comes close" may stop the clip.
+# Jude's Part 6: the check belongs at the end, not the start. 0 lets it fire from the
+# first wave, which is what shipped; set it to measure what that early stop costs.
+# Note the schedule: at 80 samples the waves are 8, 16, 24, 40, 80 and the bar is only
+# tested BETWEEN waves, so any value above 40 stops it firing at all.
+PV2_GIVEUP_MIN_FRAMES = int(os.environ.get("PDQ_PROBE_GIVEUP_MIN_FRAMES", "0"))
+# Does a wave judge on EVERYTHING seen so far, or only on its own frames?
+#
+# Carrying forward is what ships, and it is what Jude's Part 5 asks for: one frame
+# matching a film in wave 1 plus one more in wave 2 is two frames, and a rule needing
+# two can fire. Judging each wave alone would see one and one and never fire.
+#
+# This switch exists to MEASURE that rather than assert it. Setting it to 0 makes each
+# wave judge on its own frames only, which is the "separate buckets" behaviour, and the
+# difference between the two runs is what carrying forward actually buys.
+PV2_CARRY_FORWARD = os.environ.get("PDQ_PROBE_CARRY", "1") == "1"
+# Decode a wave's frames in ascending time. A wave's MEMBERSHIP is what the spread
+# guarantees; the order within it is free, and seeking forward inside each wave keeps the
+# backward jumps down to one per wave.
+PV2_WAVE_DECODE_SORTED = os.environ.get("PDQ_PROBE_WAVE_UNSORTED") != "1"
+# --- where the samples SIT, as against the order they are taken in -----------------------
+# The probe has always sampled the whole clip: sample i is taken at (i + 0.5) / n of the
+# duration, so 40 samples span 1.2% to 98.8% and the "first 40 frames" story is not what the
+# code does. But every position in that grid is a function of n, so raising the count does
+# not ADD samples, it MOVES all of them: the 40-sample grid and the 50-sample grid share not
+# one moment. That is why 50 measured WORSE than 40 (13 right against 15) - it was not 40
+# plus 10, it was a different 40, and it gained two clips and lost four.
+#
+# Anchored, a sample's position does not mention n at all: sample k sits at
+# lo + (hi - lo) * radical_inverse2(k). So the first eight moments are the same eight at any
+# sample count, 50 really is 40 plus 10, and a sample id names a moment of the clip rather
+# than a slot of whichever grid was in force. See pv2_waves.anchored_fractions.
+#
+# Off by default until it is measured over the 125 clips, as with every other change here.
+# PDQ_PROBE_ANCHORED=0 PDQ_PROBE_PROGRESSIVE=0 PDQ_PROBE_WAVE_ORDER=linear is the engine as
+# it was before any of this.
+#   grid     - sample i at (i + 0.5) / n. Even, and every position moves when n changes.
+#   anchored - sample k at a position that never mentions n. Fixed, but NOT evenly spaced
+#              at a count that is not a power of two, and the spacing turns out to matter:
+#              measured over the 125 clips, 41 right / 2 wrong against the grid's 46 / 1.
+#   nested   - even AND fixed, at the price that the count may only double. 80 samples is
+#              the same 40 moments plus the 40 midpoints, so 40 against 80 is the
+#              comparison that 40 against 50 could never be.
+# "nested" since 17 Oct 2026, and it ships together with PV2_SAMPLES=80 - neither is worth
+# having alone. Nested at 40 measures WORSE than the grid at 40 (41 right against 46), because
+# moving every sample by about 1% of the clip is itself worth 8 clips either way on a set this
+# size. Nested at 80 beats the grid at 40 and beats nested at 40 without losing a single clip,
+# which is the comparison that is not luck.
+#
+# PDQ_PROBE_SAMPLE_MODE=grid PDQ_PROBE_SAMPLES=40 is exactly what shipped before this.
+PV2_SAMPLE_MODE = os.environ.get(
+    "PDQ_PROBE_SAMPLE_MODE",
+    "anchored" if os.environ.get("PDQ_PROBE_ANCHORED") == "1" else "nested")
+# True for either fixed-position mode: both take their ids in order, so the wave schedule
+# is read literally rather than scaled, and both make sample_i mean a moment of the clip.
+PV2_ANCHORED = PV2_SAMPLE_MODE != "grid"
+# The count the nesting is built around: 80 and 160 contain these 40 moments, 50 cannot.
+PV2_SAMPLE_BASE = int(os.environ.get("PDQ_PROBE_SAMPLE_BASE", "40"))
+# Stop opening new waves once the clip has had this long. 0 disables it.
+#
+# Measured over the 125 real clips at 80 samples: of the 51 clips the probe can identify
+# at all, 47 are identified within 15 s and the remaining 4 take up to 97 s. So the last
+# 8% of the answers cost more than six times the wait, which is not a trade worth making.
+# At 15 s the set takes 12.2 min for 47 right, against 17.5 min for 51 uncapped - and
+# against 11.3 min for 46 at the 40 samples this replaced. Better on every count than
+# where this started, worst case included.
+#
+# The cap is checked BETWEEN waves, never inside one, so a wave is always judged on
+# complete evidence: a half-sampled wave would hand the rulebook a film-time agreement
+# that the full wave might have contradicted.
+#
+# OFF, because measured at 15 s it does not do what it claims. The last wave is 40 of
+# the 80 frames, so a clip sitting at 14 s opens a 40-frame wave and runs straight
+# through the cap: 26 of the 125 clips still finished past 15 s, one of them at 168 s,
+# which is worse than the 97 s worst case without any cap at all. It cost 3 right
+# answers (48 against 51) and saved no time. "Overrun by one wave" is only a small
+# overrun when the waves are small, and the last one is not.
+#
+# Worth revisiting with a finer ladder at the top end - 8, 16, 24, 40, 56, 80 - where
+# the cap would have something to bind against. Measure before turning it on.
+#
+# One other thing the measurement showed: a time cap is LOAD-DEPENDENT. The same 15 s
+# cost 13 clips on a machine running something else, against 3 on an idle one, because
+# what hits a clock is slow work rather than weak evidence. On a busy pod it would cut
+# deepest exactly when the system is most loaded. A cap on FRAMES has no such problem,
+# and PV2_SAMPLES already is one.
+PV2_BUDGET_S = float(os.environ.get("PDQ_PROBE_BUDGET_S", "0"))
+# How far off each end to hold the samples, as a fraction of the clip. Clips open on title
+# cards, watermarks and black, and close on credits. The grid's own first sample was half a
+# step in - 1.2% at 40 samples - which was never a decision; these are settable so the
+# choice can be measured.
+PV2_SAMPLE_LO = float(os.environ.get("PDQ_PROBE_SAMPLE_LO", "0.02"))
+PV2_SAMPLE_HI = float(os.environ.get("PDQ_PROBE_SAMPLE_HI", "0.98"))
+# Refuse a sample landing within this fraction of one already taken. Read
+# anchored_fractions before setting it: the positions lie on a dyadic grid, so 0.02 caps the
+# usable count at 33 rather than thinning the tail, and the measured smallest gap at 40
+# samples is 1.5% of the clip already.
+PV2_SAMPLE_MIN_GAP = float(os.environ.get("PDQ_PROBE_SAMPLE_MIN_GAP", "0"))
+# Which bars may accept before the last wave. P3.5 is deliberately absent: it turns on being
+# the SOLE candidate in the index, so a film that clears it on wave one can stop being sole
+# once a later wave finds a rival, and accepting early would answer where the full scan
+# refuses. Deferring it to the last wave costs 1% of the frames and closes that hole.
+# Measured: --early-tiers all is 48% of frames instead of 49%, with the same answers on this
+# set - which is luck, not structure, so the guard stays.
+PV2_WAVE_EARLY_TIERS = frozenset(("PV-A", "P1", "PV-B", "PV-E", "PV-C"))
+
+# --- the two passes and the fallback (see the header of two_pass_lab.py) -------------------
+# Three stages over three DIFFERENT slices of the spread order, so no frame is sampled twice,
+# while every frame already decoded is re-fingerprinted under the later stages' views for the
+# cost of the hashing alone.
+#
+#   1 CROPPED    the centred crops. These carry the matches - 50 of 78 edited clips and 44 of
+#                125 real ones accept on them alone, against 28 and 15 for uncropped - so
+#                they go first, and most clips never reach stage 2.
+#   2 UNCROPPED  the whole frame and its safe-trimmed copy, over fresh frames AND over stage
+#                one's, which are already in hand.
+#   3 FALLBACK   more frames again, every view, judged by the same bars. Measured on the 125
+#                real clips it recovers 12, 12 and 16 of the 94 fall-throughs at 8, 12 and 20
+#                frames: MORE FRAMES is what pays here, not looser rules. Looser bars get 17
+#                but add a second wrong answer, and shape-only bars are worse (7, 9, 12).
+PV2_PASSES = os.environ.get("PDQ_PROBE_PASSES") == "1"
+PV2_PASS1_FRAMES = int(os.environ.get("PDQ_PROBE_PASS1", "8"))      # cropped
+PV2_PASS2_FRAMES = int(os.environ.get("PDQ_PROBE_PASS2", "12"))     # uncropped
+PV2_PASS3_FRAMES = int(os.environ.get("PDQ_PROBE_PASS3", "20"))     # the fallback
+# 1.5 s a pass buys about 11 cropped frames for a typical clip and 5 at the ninetieth
+# percentile, measured over the 125 real clips at clip-native resolution:
+#     python two_pass_lab.py --tag cells --budget 1.5
+PV2_CROPPED_GROUPS = ("PORTRAIT", "SQUARE", "LANDSCAPE")
+# PDQ_PROBE_PROGRESSIVE=0 with PDQ_PROBE_WAVE_ORDER=linear reproduces the all-at-once probe
+# exactly - the escape hatch if any of the above is ever in doubt.
 
 # --- early reject: give up on a clip that is clearly not in the library ---
 REJECT_MIN_HASHES = 64     # after 64 fingerprints ...
@@ -980,6 +1187,9 @@ class ClipResult:
     hints: list           # [(vidx, range_str, frames, avg_hamming), ...]
     movie_stats: dict     # the raw scorecards, for anyone who wants to dig
     wait_seconds: float   # what the orchestrator would wait before trusting this exit
+    # The hint bucket with the shape of each candidate's evidence - see pv2_scorecard. Last
+    # and defaulted so the three positional ClipResult(...) calls keep working unchanged.
+    scorecard: list = None
 
 
 def whole_clip_prescan(video_path: str, index: LoadedIndex, groups: List[str]) -> Optional[dict]:
@@ -1045,123 +1255,1131 @@ def whole_clip_prescan(video_path: str, index: LoadedIndex, groups: List[str]) -
         cap.release()
 
 
-def super_probe(video_path: str, index: LoadedIndex, groups: List[str]):
-    """The probe, version 2. Samples PV2_SAMPLES frames across the WHOLE clip (the pre-scan's
-    trick), hashes the full frame, the trimmed view and the crops (the full system's views,
-    which the old pre-scan and probe never used), and keeps a mini-scorecard per film:
+def pv2_sample_order(n_samples: int, mode: str | None = None) -> List[int]:
+    """The order the probe takes its samples in - see pv2_waves.sample_order.
 
-      - how many distinct sampled frames hit it, and how good the best hit is
-      - whether the hits AGREE on film time (offset = film time - clip time; a true match
-        gives the same offset for every matched frame - the system's own words)
-      - whether the hits came from different moments of the clip
+    The algorithm lives in pv2_waves.py, which imports nothing, so replay_rules.py can
+    simulate a schedule using the SAME code without dragging in faiss and pdqhash. Only the
+    configuration lives here."""
+    if PV2_SAMPLE_MODE == "nested" and mode is None:
+        return _nested_order(int(n_samples), PV2_SAMPLE_BASE)
+    if PV2_ANCHORED and mode is None:
+        # Anchored, the spread lives in the POSITIONS, not in the order of the ids, so the
+        # ids are taken in their own order and id k is the k-th moment of the clip the probe
+        # looks at. One consequence worth knowing: vdc and linear mean the same thing here,
+        # so reproducing the pre-wave engine needs PDQ_PROBE_ANCHORED=0 as well.
+        return list(range(int(n_samples)))
+    return _wave_order(n_samples, PV2_WAVE_ORDER if mode is None else mode)
 
-    Then its own small rulebook, strongest evidence first:
-      PV-A  two near-perfect frames                        (mirrors P2.5)
-      PV-B  the old pre-scan bar, plus film-time agreement (mirrors pre-scan + P4's check)
-      PV-C  five medium frames, aligned, from two moments  (mirrors P6a)
 
-    Returns (accept-or-None, ranked) where ranked is [(frames, avg, vidx, offset), ...] so
-    the caller can publish hints even when nothing is accepted."""
-    import cv2
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        return None, []
-    try:
+def pv2_sample_fractions(n_samples: int) -> List[float]:
+    """Where each sample id sits in the clip, as a fraction of the duration.
+
+    Anchored, this is the whole of the sampling: see pv2_waves.anchored_fractions. Its
+    LENGTH is authoritative and can be shorter than asked for, because
+    PDQ_PROBE_SAMPLE_MIN_GAP may refuse candidates.
+
+    Off, it is the grid the probe has always used, which spans the whole clip just as
+    evenly but re-sites every sample whenever n changes."""
+    n = max(int(n_samples), 1)
+    if PV2_SAMPLE_MODE == "nested":
+        return _nested_fractions(n, PV2_SAMPLE_LO, PV2_SAMPLE_HI)
+    if PV2_SAMPLE_MODE == "anchored":
+        return _anchored_fractions(n, PV2_SAMPLE_LO, PV2_SAMPLE_HI, PV2_SAMPLE_MIN_GAP)
+    if PV2_SAMPLE_MODE != "grid":
+        raise ValueError("unknown PDQ_PROBE_SAMPLE_MODE %r (grid, anchored or nested)"
+                         % PV2_SAMPLE_MODE)
+    return [(i + 0.5) / n for i in range(n)]
+
+
+def pv2_wave_bounds(n_samples: int, waves=None) -> List[int]:
+    """The waves as cumulative sample counts - see pv2_waves.wave_bounds.
+
+    With PV2_PROGRESSIVE off this is one wave holding every frame, which is exactly the
+    all-at-once probe."""
+    if waves is None:
+        waves = PV2_WAVES if PV2_PROGRESSIVE else (int(n_samples),)
+    # Anchored, wave one is the same eight moments at any sample count, so the schedule is
+    # taken literally and the extra samples become a final wave: at 50 frames that is
+    # 8, 16, 24, 40, 50, and a clip that answers on wave one still pays for eight frames
+    # whatever the total is set to. On the grid every position depends on n, so a wave of 8
+    # out of 80 would cover a quarter of the clip rather than the whole of it, and there the
+    # schedule has to be scaled instead.
+    ref = int(n_samples) if PV2_ANCHORED else PV2_SAMPLES
+    return _wave_bounds(n_samples, waves, max(ref, 1))
+
+
+_VIEW_CLASSES = {"plain": ("plain",), "extra": ("extra",), "all": ("plain", "extra")}
+
+
+class ProbeRun:
+    """One run of the probe over a clip, extendable A WAVE AT A TIME.
+
+    This exists because the probe used to be all-or-nothing. It paid every seek and every
+    fingerprint before anyone looked at a single result - 10.9 s on the median clip, 46.6 s
+    at p90, 242.5 s at worst, and not one of the 125 real clips under a second - even when
+    the first sampled frame was a perfect match, and even when the clip is not in the
+    catalogue at all and no number of frames was ever going to help.
+
+    A run holds the open video, the evidence so far, and a ledger of what has already been
+    fingerprinted, so extend() can be called repeatedly and only ever pays for what is new:
+
+      - ONE cv2.VideoCapture for the whole run. Re-opening and re-seeking a compressed video
+        is the cost the old two-stage probe paid twice, which is why it came out slower on
+        every clip it declined (measured: Soul 35.1 s -> 58.7 s).
+      - The `hashed` ledger (sample -> which view classes are done) means re-requesting a
+        sample costs nothing, and asking for the mirrored views over frames already decoded
+        costs hashes but no seeks.
+      - Each extend() searches ONLY its new fingerprints and merges the result. Splitting one
+        batched search into per-wave searches is cost-neutral - measured on the real
+        7.3M-row shard at K=64, one batch of 400 takes 1.56-1.84 s and waves of
+        80/80/80/160 take 1.67-1.75 s - because faiss parallelises over the query block and
+        80 rows already saturate the threads. So giving up early saves search time too.
+
+    That makes the all-at-once probe, the progressive schedule and the two-stage view pass
+    the same code path rather than three copies of one loop that drift apart.
+
+    ok is False when the clip is unreadable or 2 s or shorter, which is what
+    collect_probe_evidence returning None has always meant."""
+
+    def __init__(self, video_path: str, index: LoadedIndex, groups: List[str],
+                 n_samples: int | None = None, maxdim: int | None = None,
+                 keep_frames: bool = False, frames: list | None = None):
+        self.video_path = str(video_path)
+        self.index = index
+        self.groups = list(groups)
+        self.n_samples = PV2_SAMPLES if n_samples is None else int(n_samples)
+        self.maxdim = maxdim
+        self.keep_frames = keep_frames
+        self.film_hits: Dict[int, dict] = {}
+        # (vidx, sample_i, group, view) -> (distance, clip_t, film_t, target). The overall
+        # best per (film, frame) is the minimum over these, which is what film_hits holds.
+        self.cells: Dict[tuple, tuple] = {}
+        self.consumed: List[int] = []       # sample indices decoded, in decode order
+        # sample_i -> {(group, view)} already fingerprinted. Per TARGET rather than per view
+        # class, so one pass can take the cropped pictures from a frame and another the
+        # uncropped ones, with neither repeating the other.
+        self.hashed: Dict[int, set] = {}
+        self.kept: Dict[int, tuple] = {}    # sample_i -> (clip_t, rgb)
+        # Where each sample id sits, as a fraction of the duration. Empty when the frames
+        # were handed in, because those carry their own times in kept.
+        self._fracs: List[float] = []
+        self.seek_s = self.hash_s = self.search_s = 0.0
+        self.n_hashes = self.frames_decoded = self.index_searches = 0
+        self.query_rows = self.waves_used = 0
+        self.duration_s = 0.0
+        self.decoded = frames is None
+        self.ok = False
+        self._cap = None
+        self._seen: set = set()
+        self._failed: set = set()
+        self._t0 = time.perf_counter()
+
+        if frames is not None:
+            # Handed the frames already, so never touch the video. super_probe's two-stage
+            # pass comes through here, and these quirks are part of that contract: the
+            # duration is the LAST sample's time rather than the clip's, and decoded is False.
+            self.duration_s = frames[-1][1] if frames else 0.0
+            self.n_samples = len(frames) or 1
+            for i, t, rgb in frames:
+                self.kept[i] = (t, rgb)
+                self.consumed.append(i)
+                self._seen.add(i)
+            self.ok = True
+            return
+
+        import cv2
+        cap = cv2.VideoCapture(self.video_path)
+        if not cap.isOpened():
+            return
         fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
         n = float(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0)
         dur = (n / fps) if fps > 0 else 0.0
+        self.duration_s = dur
         if dur <= 2.0:
-            return None, []
-        t0 = time.time()
-        samples: Dict[str, list] = {g: [] for g in groups}   # g -> [(sample_i, clip_t, hash), ...]
-        for i in range(PV2_SAMPLES):
-            t = dur * (i + 0.5) / PV2_SAMPLES
-            cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
-            ok, bgr = cap.read()
-            if not ok or bgr is None:
-                continue
+            cap.release()
+            return
+        self._cap = cap
+        self._fracs = pv2_sample_fractions(self.n_samples)
+        # The grid's length wins over the request: PDQ_PROBE_SAMPLE_MIN_GAP can refuse
+        # candidates, so asking for 40 may yield 33, and the wave schedule and every
+        # reported frame count are counted off n_samples.
+        self.n_samples = len(self._fracs) or self.n_samples
+        self.ok = True
+        self._t0 = time.perf_counter()      # as before: the clock starts after the checks
+
+    # ---- the schedule ----------------------------------------------------------------------
+
+    @property
+    def bounds(self) -> List[int]:
+        return pv2_wave_bounds(self.n_samples)
+
+    @property
+    def n_waves(self) -> int:
+        return len(self.bounds)
+
+    def schedule(self):
+        """The waves, as lists of sample indices, in spread order.
+
+        Each wave is evenly spread over the whole clip on its own AND the union of the waves
+        so far stays evenly spread - see pv2_sample_order. With PV2_PROGRESSIVE off this
+        yields one wave holding every sample, which is the old behaviour exactly."""
+        order = pv2_sample_order(self.n_samples)
+        prev = 0
+        for b in self.bounds:
+            yield order[prev:b]
+            prev = b
+
+    def time_of(self, i: int) -> float:
+        """Sample id i's clip time.
+
+        Anchored, id i is a fixed fraction of this clip that does not depend on how many
+        samples the run takes, so id 3 is the same moment at 40 samples as at 50. On the
+        grid it is (i + 0.5) / n, as every row already in output/probe_evidence.csv was
+        recorded - which is also why those rows cannot be replayed against an anchored
+        schedule: the same sample_i means a different moment.
+
+        The second round's ids are negative and off the grid altogether, so the kept frames
+        are consulted first: they carry their own time."""
+        hit = self.kept.get(i)
+        if hit is not None:
+            return hit[0]
+        if 0 <= i < len(self._fracs):
+            return self.duration_s * self._fracs[i]
+        return self.duration_s * (i + 0.5) / max(self.n_samples, 1)
+
+    # ---- the work --------------------------------------------------------------------------
+
+    def _frame(self, i: int):
+        """Sample i as RGB, from the kept frames or by seeking. None if it cannot be read."""
+        hit = self.kept.get(i)
+        if hit is not None:
+            return hit[1]
+        if self._cap is None or i in self._failed:
+            return None
+        import cv2
+        t = self.time_of(i)
+        tk = time.perf_counter()
+        self._cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+        ok, bgr = self._cap.read()
+        rgb = None
+        if ok and bgr is not None:
             rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-            # The views of this frame. Beyond the plain frame: the picture inside any
-            # letterbox bars (edit test: letterbox scored 1/8 without this), and the
-            # mirror of each (the classic repost trick; mirror scored 0/8 without it).
-            views = [rgb]
-            region = active_region(rgb)
-            if region is not None:
-                views.append(region)
-            views += [np.ascontiguousarray(v[:, ::-1]) for v in list(views)]
-            targets = []
-            for vi, v in enumerate(views):
-                if "FULL" in groups:
-                    targets.append(("FULL", v))
-                    if vi == 0:
-                        sv = safe_trim_view(v)
-                        if sv is not None:
-                            targets.append(("FULL", sv))
-                for c in CROPS:
-                    g = group_for_crop_name(c.name)
-                    if g in groups:
-                        targets.append((g, center_crop_aspect(v, c.ar_w, c.ar_h, c.scale)))
-            for g, img in targets:
-                hb, q = pdq_hash(img)
-                if q >= CLIP_QUALITY_MIN:
-                    samples[g].append((i, t, hb))
-        # one best hit per (film, sampled frame), with its clip time and film time
-        film_hits: Dict[int, dict] = defaultdict(dict)   # vidx -> {sample_i: (dist, clip_t, film_t)}
-        for g, sl in samples.items():
-            if not sl or g not in index.index_by_group:
+            if self.maxdim:
+                ow, oh = _scaled_dims(rgb.shape[1], rgb.shape[0], self.maxdim)
+                if (ow, oh) != (rgb.shape[1], rgb.shape[0]):
+                    rgb = cv2.resize(rgb, (ow, oh), interpolation=cv2.INTER_AREA)
+            self.frames_decoded += 1
+        self.seek_s += time.perf_counter() - tk
+        if rgb is None:
+            self._failed.add(i)
+            return None
+        if i not in self._seen:
+            self._seen.add(i)
+            self.consumed.append(i)
+        if self.keep_frames:
+            self.kept[i] = (t, rgb)
+        return rgb
+
+    def _hash_into(self, samples: dict, i: int, t: float, views: str, groups=None) -> None:
+        """Fingerprint sample i, skipping any picture already taken from it.
+
+        The ledger is per (group, view class), not per view class alone, which is what lets
+        the cropped pass and the uncropped pass ask for their own pictures from the SAME
+        decoded frame without either repeating the other's work."""
+        want = list(groups) if groups is not None else self.groups
+        rgb = self._frame(i)
+        if rgb is None:
+            return
+        done = self.hashed.setdefault(i, set())
+        th = time.perf_counter()
+        for g, img, tag in _probe_targets(rgb, want, views):
+            key = (g, view_class(tag))
+            if key in done:
                 continue
-            xq = np.frombuffer(b"".join(hb for _, _, hb in sl), dtype=np.uint8).reshape(-1, 32)
-            D, I = index.index_by_group[g].search(xq, K_PER_HASH)
-            for row in range(D.shape[0]):
-                si, ct, _ = sl[row]
-                for col in range(D.shape[1]):
-                    d = int(D[row, col]); nn = int(I[row, col])
-                    if nn < 0 or d >= MAX_HAMMING:
-                        continue
-                    v = int(index.meta_vid[g][nn])
-                    cur = film_hits[v].get(si)
-                    if cur is None or d < cur[0]:
-                        film_hits[v][si] = (d, ct, float(index.meta_ts[g][nn]))
+            hb, q = pdq_hash(img)
+            if q >= CLIP_QUALITY_MIN:
+                samples.setdefault(g, []).append((i, t, hb, tag))
+        self.hash_s += time.perf_counter() - th
+        # mark every (group, view) this call covered, hit or miss, so it is not retried
+        for g in want:
+            for vc in _VIEW_CLASSES[views]:
+                done.add((g, "p" if vc == "plain" else "x"))
 
-        def aligned(rs) -> int:
-            """The largest number of hits agreeing on one film-time offset."""
-            offs = sorted(ft - ct for _, ct, ft in rs)
-            return max((sum(1 for o in offs if abs(o - o0) <= PV2_OFFSET_TOL_S) for o0 in offs), default=0)
+    def _search_and_merge(self, samples: dict, subindex=None) -> dict:
+        rows = sum(len(v) for v in samples.values())
+        self.n_hashes += rows
+        self.query_rows += rows
+        ts = time.perf_counter()
+        if subindex is None:
+            delta, searches, cells = _probe_search(samples, self.index)
+        else:
+            delta, searches, cells = _probe_search_shortlist(samples, self.index, subindex)
+        self.search_s += time.perf_counter() - ts
+        self.index_searches += searches
+        _merge_film_hits(self.film_hits, delta)
+        # And the per-cell bests, by the same keep-the-smaller rule. These are what make a
+        # pass simulable offline; film_hits above is still what the rulebook judges.
+        for k, row in cells.items():
+            cc = self.cells.get(k)
+            if cc is None or row[0] < cc[0]:
+                self.cells[k] = row
+        return delta
 
-        def spread(rs) -> int:
-            return _unique_time_clusters([ct for _, ct, _ in rs], PV2_SPREAD_S)
+    def extend(self, indices, views: str = "all", groups=None) -> tuple:
+        """Take these samples, fingerprint whatever is new, search it, merge it.
 
-        tier_rank = {"PV-A": 0, "PV-B": 1, "PV-C": 2}
-        best_accept = None
-        ranked = []
-        for v, hits in film_hits.items():
-            rows = sorted(hits.values())             # (dist, clip_t, film_t), best first
-            best = float(rows[0][0])
-            avg = sum(r[0] for r in rows) / len(rows)
-            ranked.append((len(rows), float(avg), int(v), float(rows[0][2])))
-            a = [r for r in rows if r[0] < PV2_A_DIST]
-            b = [r for r in rows if r[0] < PV2_B_DIST]
-            c = [r for r in rows if r[0] < PV2_C_DIST]
-            tier = None
-            if best < PV2_A_BEST and len(a) >= PV2_A_FRAMES:
-                tier = ("PV-A", f"best={best:.0f} frames_under_{PV2_A_DIST:.0f}={len(a)}")
-            elif best < PV2_B_BEST and len(b) >= PV2_B_FRAMES and aligned(b) >= PV2_B_NEED_ALIGN:
-                tier = ("PV-B", f"best={best:.0f} frames_under_{PV2_B_DIST:.0f}={len(b)} aligned={aligned(b)}")
-            elif best < PV2_C_BEST and len(c) >= PV2_C_FRAMES and aligned(c) >= PV2_C_NEED_ALIGN and spread(c) >= PV2_C_NEED_SPREAD:
-                tier = ("PV-C", f"best={best:.0f} frames_under_{PV2_C_DIST:.0f}={len(c)} aligned={aligned(c)} moments={spread(c)}")
-            if tier:
-                key = (-tier_rank[tier[0]], aligned(c), -best)
-                if best_accept is None or key > best_accept[0]:
-                    best_accept = (key, int(v), tier, best, len(rows), float(rows[0][2]))
-        ranked.sort(key=lambda x: (-x[0], x[1]))
-        if best_accept is None:
-            return None, ranked
-        _, v, (tname, detail), best, nhits, off = best_accept
-        print(f"[PROBE-V2] {tname} HIT in {time.time() - t0:.1f}s: vidx={v} {detail} -> early accept")
-        return {"vidx": v, "frames": nhits, "min_hamming": best, "offset": off,
-                "reason": f"{tname}: probe-v2 {detail}"}, ranked
+        groups restricts which of the index's families this call looks at - {"FULL"} for the
+        uncropped pass, the crop families for the cropped one. Only the shards named here are
+        searched, which is most of why an uncropped pass is cheap: FULL holds 1,912,233 of
+        the index's 16,744,500 fingerprints.
+
+        Returns (evidence, delta) - the whole run's evidence so far, and just what this call
+        added, so a caller can apply a give-up bar without rescanning everything."""
+        if views not in _VIEW_CLASSES:
+            raise ValueError("views must be all, plain or extra, not %r" % views)
+        want = [int(i) for i in indices]
+        if PV2_WAVE_DECODE_SORTED:
+            # A wave's MEMBERSHIP is what the even spread guarantees; the order inside it is
+            # free, so seek forward within a wave and keep the backward jumps to one per wave.
+            # By TIME and not by id: anchored, the ids are taken in their own order and say
+            # nothing about position in the clip, so sorting the ids would seek at random.
+            want.sort(key=self.time_of)
+        use = [g for g in (groups if groups is not None else self.groups) if g in self.groups]
+        need = {(g, "p" if vc == "plain" else "x")
+                for g in use for vc in _VIEW_CLASSES[views]}
+        samples: Dict[str, list] = {g: [] for g in use}
+        for i in want:
+            if need <= self.hashed.get(i, set()):
+                continue                    # every picture this call wants is already taken
+            self._hash_into(samples, i, self.time_of(i), views, use)
+        delta = self._search_and_merge(samples)
+        self.waves_used += 1
+        return self.evidence(), delta
+
+    def extend_at_times(self, times, first_id: int = -1, views: str = "all",
+                        shortlist=None) -> tuple:
+        """Sample at arbitrary clip times rather than on the grid, for the second round.
+
+        Ids count away from first_id (so -1, -2, -3 ...), keeping the extra samples in their
+        own namespace where they cannot collide with a wave's."""
+        step = -1 if first_id < 0 else 1
+        samples: Dict[str, list] = {g: [] for g in self.groups}
+        for k, t in enumerate(times):
+            self._at_time(samples, first_id + step * k, float(t), views)
+        delta = self._search_and_merge(samples, subindex=shortlist)
+        return self.evidence(), delta
+
+    def _at_time(self, samples: dict, i: int, t: float, views: str) -> None:
+        """One off-grid sample: seek to t, fingerprint it under id i."""
+        import cv2
+        if i in self.kept:
+            rgb = self.kept[i][1]
+        else:
+            tk = time.perf_counter()
+            self._cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+            ok, bgr = self._cap.read()
+            rgb = None
+            if ok and bgr is not None:
+                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+                if self.maxdim:
+                    ow, oh = _scaled_dims(rgb.shape[1], rgb.shape[0], self.maxdim)
+                    if (ow, oh) != (rgb.shape[1], rgb.shape[0]):
+                        rgb = cv2.resize(rgb, (ow, oh), interpolation=cv2.INTER_AREA)
+                self.frames_decoded += 1
+            self.seek_s += time.perf_counter() - tk
+            if rgb is None:
+                return
+            if self.keep_frames:
+                self.kept[i] = (t, rgb)
+        th = time.perf_counter()
+        for g, img, tag in _probe_targets(rgb, self.groups, views):
+            hb, q = pdq_hash(img)
+            if q >= CLIP_QUALITY_MIN:
+                samples[g].append((i, t, hb, tag))
+        self.hash_s += time.perf_counter() - th
+
+    def has_unhashed_extra(self) -> bool:
+        """Is there a decoded frame whose mirrored / letterbox views were never taken?"""
+        return any("extra" not in self.hashed.get(i, ()) for i in self.consumed)
+
+    # ---- what comes out ---------------------------------------------------------------------
+
+    def evidence(self) -> dict:
+        """The dict collect_probe_evidence has always returned, plus the cost split.
+
+        elapsed_s stays the run's wall clock, so super_probe's accumulation keeps working.
+        seek_s + hash_s + search_s <= elapsed_s, the remainder being overhead; before this
+        there was no way to tell the three apart, and the claim that hashing dominates rested
+        on a regression across clips (R^2 0.24) rather than measurement."""
+        frames = None
+        if self.keep_frames:
+            frames = [(i, self.kept[i][0], self.kept[i][1])
+                      for i in self.consumed if i in self.kept and self.kept[i][1] is not None]
+        return {"film_hits": self.film_hits, "cells": self.cells,
+                "duration_s": self.duration_s,
+                "elapsed_s": time.perf_counter() - self._t0,
+                "n_samples": self.n_samples, "groups": list(self.groups),
+                "index_searches": self.index_searches, "n_hashes": self.n_hashes,
+                "frames": frames, "decoded": self.decoded,
+                "seek_s": self.seek_s, "hash_s": self.hash_s, "search_s": self.search_s,
+                "frames_decoded": self.frames_decoded, "query_rows": self.query_rows,
+                "waves_used": self.waves_used}
+
+    def close(self) -> None:
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
+
+def collect_probe_evidence(video_path: str, index: LoadedIndex, groups: List[str],
+                           n_samples: int | None = None, maxdim: int | None = None,
+                           views: str = "all", frames: list | None = None,
+                           keep_frames: bool = False) -> Optional[dict]:
+    """GATHER the probe's evidence. No decisions here - see pv2_decide for those.
+
+    Samples n_samples frames across the WHOLE clip (the pre-scan's trick), hashes the full
+    frame, the trimmed view and the crops (the full system's views, which the old pre-scan
+    and probe never used), searches the index once per group, and keeps the best hit per
+    (film, sampled frame) with its clip time and film time.
+
+    Collection and judgement are split on purpose. Collecting is the expensive half (a seek
+    and ~15-30 fingerprints per sample, then one exhaustive index sweep per group); judging
+    is arithmetic. Splitting them lets dump_probe_evidence.py pay the cost once and
+    replay_rules.py try a thousand rulebooks against the saved result in seconds, instead of
+    re-running every clip for every threshold.
+
+    Two optional economies, both off by default so the engine's answers do not move until
+    each has been measured with dump_probe_evidence.py + replay_rules.py:
+
+      maxdim  shrink the frame before hashing. pdq_hash costs 14.3 ms on a clip-native frame
+              and 8.2 ms at 640, and the INDEX was built at FILM_MAXDIM=640, so hashing at
+              640 is both 1.7x cheaper and 3.7 bits closer to what the index holds. Do not
+              go below 640: the drift grows to 4-10 bits at 480.
+
+              MEASURED over all 125 clips, and it is NOT free, which is why it stays off.
+              640 is 3.9x faster end to end - the whole sweep 2430 s -> 622 s, the median
+              clip 10.9 s -> 4.0 s, p90 46.6 s -> 6.4 s - but the answers move:
+
+                           answers   right   known-wrong   precision
+                native          48      47             1       97.9%
+                maxdim=640      49      46             2       93.9%
+
+              It drops Race to Witch Mountain and lets a known-wrong film in through P1.
+              Re-fitting P1 (P1_BEST 15 -> 10) pulls it back to 46 right / 1 wrong at 95.8%,
+              but --loo then shows 3 known-wrong on held-out clips against 1 fitted, so that
+              setting is partly fitting these 125 clips by name.
+
+              So it is a real trade - 3.9x for one correct answer and two points of
+              precision - not an economy. Re-measure before taking it:
+                  python dump_probe_evidence.py --maxdim 640 --tag d640all
+                  python replay_rules.py --rules adopted --tag d640all
+      views   "all" (every view, as shipped), "plain" (the frame and its safe-trim copy
+              only - about 8 targets instead of 19), or "extra" (the letterbox-trimmed and
+              mirrored views only). "plain" then "extra" on demand is the two-stage search:
+              a mirrored clip finds nothing on the plain views, so stage two runs for
+              exactly the clips that need it.
+
+    And one that exists only to make the two-stage search worth doing:
+
+      frames / keep_frames
+              Reading the clip is NOT cheap. Sampling 40 frames means 40 random seeks into a
+              compressed video, and measured on a real clip that fixed cost is several
+              seconds - comparable to all the hashing. A naive two-stage probe pays it twice
+              and comes out SLOWER on every clip it declines (measured: Soul 35.1 s -> 58.7 s).
+              So stage one passes keep_frames=True, gets the decoded frames back, and stage
+              two is handed them through frames= and never touches the video again.
+
+    Returns None when the clip cannot be read or is too short, otherwise a dict with
+    film_hits = {vidx: {sample_i: (distance, clip_t, film_t)}} plus some cost counters.
+
+    Every sampled frame at once, which is what this has always done. It is now one wave of
+    a ProbeRun, so there is a single decode-and-fingerprint loop in this file instead of
+    three that drift - see ProbeRun above, and super_probe for the progressive form."""
+    run = ProbeRun(video_path, index, groups, n_samples, maxdim,
+                   keep_frames=keep_frames, frames=frames)
+    if not run.ok:
+        return None
+    try:
+        want = list(run.consumed) if frames is not None else range(run.n_samples)
+        return run.extend(want, views=views)[0]
     finally:
-        cap.release()
+        run.close()
+
+
+def _probe_targets(rgb, groups: List[str], views: str):
+    """Every (group, image) this frame should be fingerprinted as, for the requested views.
+
+    Beyond the plain frame: the picture inside any letterbox bars (edit test: letterbox
+    scored 1/8 without this), and the mirror of each (the classic repost trick; mirror
+    scored 0/8 without it). The safe-trim copy is taken from the plain frame only, as the
+    pod does."""
+    plain = [rgb]
+    region = active_region(rgb)
+    if region is not None:
+        plain.append(region)
+    if views == "plain":
+        # Build the mirrors only when they are wanted. They used to be made unconditionally
+        # and then thrown away, which is two full-frame copies per sampled frame - about
+        # 6 MB each at 1080x1920 - bought for nothing on every plain-views pass.
+        if region is not None:
+            plain.pop()                     # the letterbox-trimmed view counts as "extra"
+        chosen = [(0, v) for v in plain]
+    else:
+        extra = [np.ascontiguousarray(v[:, ::-1]) for v in plain]    # the mirrors
+        if region is not None:
+            extra.append(plain.pop())
+        if views == "extra":
+            chosen = [(1, v) for v in extra]
+        else:
+            chosen = [(0, v) for v in plain] + [(1, v) for v in extra]
+    out = []
+    for vi, v in chosen:
+        pre = "" if vi == 0 else "x:"           # x: = a mirrored or letterbox-trimmed view
+        if "FULL" in groups:
+            out.append(("FULL", v, pre + "full"))
+            if vi == 0:
+                sv = safe_trim_view(v)
+                if sv is not None:
+                    out.append(("FULL", sv, pre + "trim"))
+        for c in CROPS:
+            g = group_for_crop_name(c.name)
+            if g in groups:
+                out.append((g, center_crop_aspect(v, c.ar_w, c.ar_h, c.scale), pre + c.name))
+    return out
+
+
+# The two halves of the frame's pictures, as the two passes split them. Group FULL is the
+# WHOLE frame (and its safe-trimmed copy); every other group is a centred crop of it. That
+# split matters for cost as much as for recall: FULL holds 1,912,233 of the index's
+# 16,744,500 fingerprints - 11% - and contributes 2 pictures per view where the crops
+# contribute 6, so an uncropped pass is cheap on both sides of the search.
+UNCROPPED_GROUPS = ("FULL",)
+
+
+def is_uncropped(group: str) -> bool:
+    return group in UNCROPPED_GROUPS
+
+
+def view_class(tag: str) -> str:
+    """"p" for the frame as shot, "x" for its mirrored or letterbox-trimmed view.
+
+    Worth separating from the group because the mirrors are half of each pass's cost: an
+    uncropped pass is 2 pictures per frame without them and 3 with."""
+    return "x" if tag.startswith("x:") else "p"
+
+
+def film_row_range(index: LoadedIndex, g: str, vidx: int):
+    """Where one film's fingerprints sit in a shard, as a (lo, hi) row range.
+
+    Every film's rows are ONE contiguous block in every shard - checked against the real
+    index: all four shards hold exactly 134 blocks for 134 films, sorted by film and then by
+    film time, because write_index appends film by film. That is what makes a
+    candidate-restricted search trivial instead of needing a FAISS IDSelector (measured
+    SLOWER than not restricting at all, since it scans everything and filters).
+
+    Returns (0, 0) if the film has no rows in this group."""
+    mv = index.meta_vid[g]
+    lo = int(np.searchsorted(mv, vidx, side="left"))
+    hi = int(np.searchsorted(mv, vidx, side="right"))
+    if hi > lo and (int(mv[lo]) != vidx or int(mv[hi - 1]) != vidx):
+        # The block assumption is broken, so a slice would silently return another film's
+        # rows. Fail loudly rather than answer with the wrong evidence.
+        raise RuntimeError(f"index rows for film {vidx} in {g} are not contiguous; "
+                           f"rebuild the index or stop using film_row_range")
+    return lo, hi
+
+
+def _subindex_for_films(index: LoadedIndex, g: str, vidxs) -> tuple:
+    """A throwaway flat index over just these films' rows, plus the row offsets to map
+    results back to global row numbers. Measured: slicing 2.3 MB off the memory-mapped shard
+    takes 0.002 s and building the sub-index 0.000 s, so this is free next to a full sweep."""
+    blocks, offsets = [], []
+    for v in vidxs:
+        lo, hi = film_row_range(index, g, int(v))
+        if hi <= lo:
+            continue
+        blocks.append(index.index_by_group[g].reconstruct_n(lo, hi - lo))
+        offsets.append((lo, hi - lo))
+    if not blocks:
+        return None, []
+    sub = faiss.IndexBinaryFlat(256)
+    sub.add(np.concatenate(blocks, axis=0) if len(blocks) > 1 else blocks[0])
+    return sub, offsets
+
+
+def _global_row(offsets, local_row: int) -> int:
+    """Turn a sub-index row number back into a row number in the full shard."""
+    for lo, n in offsets:
+        if local_row < n:
+            return lo + local_row
+        local_row -= n
+    return -1
+
+
+def resample_candidates(video_path: str, index: LoadedIndex, groups: List[str],
+                        film_hits: dict, shortlist, n_extra: int = 40,
+                        maxdim: int | None = None, frames: list | None = None,
+                        run=None) -> dict:
+    """SECOND ROUND. Sample more frames where hits already came from, and search ONLY the
+    shortlisted films.
+
+    Why this exists: of the clips the probe refuses while already holding the right film as
+    its top hint, many are starved of corroboration rather than of signal - The Walking Dead
+    sits at average distance 14 on two frames. No rule can fix two frames; more frames can.
+    And a fan edit's cuts are only seconds long, so 40 samples spread over the whole clip
+    land inside each cut at most once, which is why the cut rule finds nothing to corroborate.
+    Sampling densely around the moments that already matched is what gives both of them the
+    second frame they need.
+
+    It is nearly free because the search is restricted to the shortlist: one film is ~125k of
+    16.7 million fingerprints, so this round does not grow with the catalogue at all.
+
+    Returns new film_hits (merged into the ones passed in), using negative sample indices so
+    the extra samples cannot collide with the first round's."""
+    if not shortlist:
+        return film_hits
+    # The clip moments worth looking at again: wherever a shortlisted film already hit.
+    hot = sorted({round(ct, 2) for v in shortlist for _, ct, _ in film_hits.get(v, {}).values()})
+    if not hot:
+        return film_hits
+    own = run is None
+    if own:
+        run = ProbeRun(video_path, index, groups, maxdim=maxdim, frames=frames)
+        if not run.ok:
+            return film_hits
+        run.film_hits = film_hits       # merge straight into the caller's evidence
+    try:
+        dur = run.duration_s
+        if dur <= 2.0:
+            return film_hits
+        # The first round's real spacing. This used to read PV2_SAMPLES directly, so a run
+        # sampling any other number of frames got hot windows of the wrong width.
+        step = dur / max(run.n_samples, 1)
+        wanted = []
+        for ct in hot:                      # four new samples inside each hot moment
+            for frac in (-0.66, -0.33, 0.33, 0.66):
+                t = ct + frac * step
+                if 0.0 <= t <= dur:
+                    wanted.append(round(t, 2))
+        wanted = sorted(set(wanted))[:n_extra]
+        run.extend_at_times(wanted, first_id=-1, views="all", shortlist=shortlist)
+        return run.film_hits
+    finally:
+        if own:
+            run.close()
+
+
+def _probe_search(samples: dict, index: LoadedIndex):
+    """One batched index search per group, reduced to the best hit per (film, sampled frame).
+
+    Returns ({vidx: {sample_i: (distance, clip_t, film_t)}}, number of searches)."""
+    film_hits: Dict[int, dict] = defaultdict(dict)
+    cells: Dict[tuple, tuple] = {}     # (vidx, sample_i, group, view) -> (d, ct, ft, target)
+    searches = 0
+    for g, sl in samples.items():
+        if not sl or g not in index.index_by_group:
+            continue
+        xq = np.frombuffer(b"".join(r[2] for r in sl), dtype=np.uint8).reshape(-1, 32)
+        D, I = index.index_by_group[g].search(xq, K_PER_HASH)
+        searches += 1
+        for row in range(D.shape[0]):
+            si, ct, _, tag = sl[row]
+            vc = view_class(tag)
+            for col in range(D.shape[1]):
+                d = int(D[row, col]); nn = int(I[row, col])
+                if nn < 0 or d >= MAX_HAMMING:
+                    continue
+                v = int(index.meta_vid[g][nn])
+                ft = float(index.meta_ts[g][nn])
+                cur = film_hits[v].get(si)
+                if cur is None or d < cur[0]:
+                    film_hits[v][si] = (d, ct, ft)
+                k = (v, si, g, vc)
+                cc = cells.get(k)
+                if cc is None or d < cc[0]:
+                    cells[k] = (d, ct, ft, tag)
+    return dict(film_hits), searches, cells
+
+
+def _probe_search_shortlist(samples: dict, index: LoadedIndex, shortlist):
+    """Like _probe_search, but over a throwaway index holding only the shortlisted films.
+
+    Measured: one film searches 63x faster than the whole 134-film index (0.024 s vs 1.504 s
+    for 300 queries), and that cost does not grow with the catalogue."""
+    film_hits: Dict[int, dict] = defaultdict(dict)
+    cells: Dict[tuple, tuple] = {}     # (vidx, sample_i, group, view) -> (d, ct, ft, target)
+    searches = 0
+    for g, sl in samples.items():
+        if not sl or g not in index.index_by_group:
+            continue
+        sub, offsets = _subindex_for_films(index, g, shortlist)
+        if sub is None:
+            continue
+        xq = np.frombuffer(b"".join(r[2] for r in sl), dtype=np.uint8).reshape(-1, 32)
+        D, I = sub.search(xq, min(K_PER_HASH, sub.ntotal))
+        searches += 1
+        for row in range(D.shape[0]):
+            si, ct, _, tag = sl[row]
+            vc = view_class(tag)
+            for col in range(D.shape[1]):
+                d = int(D[row, col]); nn = int(I[row, col])
+                if nn < 0 or d >= MAX_HAMMING:
+                    continue
+                gr = _global_row(offsets, nn)
+                if gr < 0:
+                    continue
+                v = int(index.meta_vid[g][gr])
+                ft = float(index.meta_ts[g][gr])
+                cur = film_hits[v].get(si)
+                if cur is None or d < cur[0]:
+                    film_hits[v][si] = (d, ct, ft)
+                k = (v, si, g, vc)
+                cc = cells.get(k)
+                if cc is None or d < cc[0]:
+                    cells[k] = (d, ct, ft, tag)
+    return dict(film_hits), searches, cells
+
+
+def pv2_aligned(rows) -> int:
+    """The largest number of hits agreeing on one film-time offset. A real clip plays through
+    the film, so every matched frame lands at the same offset; a look-alike scatters."""
+    offs = sorted(ft - ct for _, ct, ft in rows)
+    return max((sum(1 for o in offs if abs(o - o0) <= PV2_OFFSET_TOL_S) for o0 in offs), default=0)
+
+
+def pv2_spread(rows) -> int:
+    """How many separate moments of the clip these hits came from."""
+    return _unique_time_clusters([ct for _, ct, _ in rows], PV2_SPREAD_S)
+
+
+def pv2_offset_clusters(rows):
+    """Group a film's hits into runs that agree on film time, largest first.
+
+    Each cluster spans at most PV2_OFFSET_TOL_S from its FIRST member, so a slow drift
+    cannot chain into one huge cluster. This is the shape the whole rulebook turns on: a
+    real scene is one big cluster, a fan edit is several corroborating clusters, and a
+    look-alike is a handful of singletons.
+
+    Returns [[(offset, distance, clip_t), ...], ...]."""
+    items = sorted((ft - ct, d, ct) for d, ct, ft in rows)
+    if not items:
+        return []
+    out, cur = [], [items[0]]
+    for it in items[1:]:
+        if it[0] - cur[0][0] <= PV2_OFFSET_TOL_S:
+            cur.append(it)
+        else:
+            out.append(cur)
+            cur = [it]
+    out.append(cur)
+    out.sort(key=len, reverse=True)
+    return out
+
+
+# Checked in this order; the bar asking for the strongest evidence wins a tie.
+PV2_TIER_RANK = {"PV-A": 0, "P1": 1, "PV-B": 2, "PV-E": 3, "PV-C": 4, "P3.5": 5}
+
+
+def pv2_decide(film_hits: dict):
+    """JUDGE the probe's evidence. The rulebook, strongest evidence first:
+
+      PV-A  two near-perfect frames                        (mirrors P2.5)
+      P1    one frame under 15, 3 hits, 2 of them agreeing (the streaming P1, plus a guard)
+      PV-B  the old pre-scan bar, plus film-time agreement (mirrors pre-scan + P4's check)
+      PV-E  two film-time clusters that each corroborate   (the cut rule, for fan edits)
+      PV-C  five medium frames, aligned, from two moments  (mirrors P6a)
+      P3.5  nothing else matched at all, so the bar drops  (the streaming P3.5)
+
+    Returns (accept-or-None, ranked) where ranked is [(frames, avg, vidx, film_t), ...] so
+    the caller can publish hints even when nothing is accepted. Pure arithmetic over the
+    dict collect_probe_evidence returns - no video, no index, no I/O, which is what lets
+    replay_rules.py try a rulebook over all 125 clips in under a second."""
+    best_accept = None
+    ranked = []
+    sole_candidate = len(film_hits) == 1
+    for v, hits in film_hits.items():
+        rows = sorted(hits.values())             # (dist, clip_t, film_t), best first
+        if not rows:
+            continue
+        best = float(rows[0][0])
+        total = len(rows)
+        avg = sum(r[0] for r in rows) / total
+        ranked.append((total, float(avg), int(v), float(rows[0][2])))
+        a = [r for r in rows if r[0] < PV2_A_DIST]
+        b = [r for r in rows if r[0] < PV2_B_DIST]
+        c = [r for r in rows if r[0] < PV2_C_DIST]
+        p1 = [r for r in rows if r[0] < PV2_P1_DIST]
+        clusters = pv2_offset_clusters(rows)
+        corroborating = [cl for cl in clusters
+                         if len(cl) >= PV2_E_PER_CLUSTER
+                         and min(d for _, d, _ in cl) <= PV2_E_BEST]
+        tier = None
+        if best < PV2_A_BEST and len(a) >= PV2_A_FRAMES:
+            tier = ("PV-A", f"best={best:.0f} frames_under_{PV2_A_DIST:.0f}={len(a)}")
+        elif (best < PV2_P1_BEST and total >= PV2_P1_FRAMES
+                and pv2_aligned(p1) >= PV2_P1_ALIGN):
+            tier = ("P1", f"best={best:.0f} with {total} frames, "
+                          f"aligned={pv2_aligned(p1)} under {PV2_P1_DIST:.0f}")
+        elif best < PV2_B_BEST and len(b) >= PV2_B_FRAMES and pv2_aligned(b) >= PV2_B_NEED_ALIGN:
+            tier = ("PV-B", f"best={best:.0f} frames_under_{PV2_B_DIST:.0f}={len(b)} aligned={pv2_aligned(b)}")
+        elif len(corroborating) >= PV2_E_CLUSTERS:
+            where = ", ".join(f"{cl[0][0] / 60.0:.1f}" for cl in corroborating[:4])
+            tier = ("PV-E", f"{len(corroborating)} corroborating clusters at {where} min")
+        elif (best < PV2_C_BEST and len(c) >= PV2_C_FRAMES and pv2_aligned(c) >= PV2_C_NEED_ALIGN
+                and pv2_spread(c) >= PV2_C_NEED_SPREAD):
+            tier = ("PV-C", f"best={best:.0f} frames_under_{PV2_C_DIST:.0f}={len(c)} "
+                            f"aligned={pv2_aligned(c)} moments={pv2_spread(c)}")
+        elif sole_candidate:
+            for lim_avg, need in PV2_P35_BARS:
+                if avg <= lim_avg and total >= need:
+                    tier = ("P3.5", f"sole candidate, {total} frames at avg {avg:.1f}")
+                    break
+        if tier:
+            key = (-PV2_TIER_RANK[tier[0]], len(clusters[0]) if clusters else 0, -best)
+            if best_accept is None or key > best_accept[0]:
+                best_accept = (key, int(v), tier, best, total, float(rows[0][2]))
+    ranked.sort(key=lambda x: (-x[0], x[1]))
+    if best_accept is None:
+        return None, ranked
+    _, v, (tname, detail), best, nhits, off = best_accept
+    return {"vidx": v, "frames": nhits, "min_hamming": best, "offset": off,
+            "tier": tname, "detail": detail,
+            "reason": f"{tname}: probe-v2 {detail}"}, ranked
+
+
+PV2_BAND_RANK = {"strong": 0, "medium": 1, "weak": 2}
+
+
+def pv2_shortfall(rows) -> str:
+    """The bar this film came closest to passing, and what it was short of.
+
+    A downstream system wants to know not just that the probe refused, but by how much. A
+    film one frame short of PV-B is a different proposition from one whose best frame is at
+    distance 44."""
+    if not rows:
+        return ""
+    best = float(rows[0][0])
+    b = [r for r in rows if r[0] < PV2_B_DIST]
+    c = [r for r in rows if r[0] < PV2_C_DIST]
+    a = [r for r in rows if r[0] < PV2_A_DIST]
+    want = []
+    if best < PV2_A_BEST:
+        if len(a) < PV2_A_FRAMES:
+            want.append(("PV-A", "%d more frame(s) under %.0f" % (PV2_A_FRAMES - len(a), PV2_A_DIST)))
+    if best < PV2_B_BEST:
+        miss = []
+        if len(b) < PV2_B_FRAMES:
+            miss.append("%d more under %.0f" % (PV2_B_FRAMES - len(b), PV2_B_DIST))
+        if pv2_aligned(b) < PV2_B_NEED_ALIGN:
+            miss.append("%d more agreeing on film time" % (PV2_B_NEED_ALIGN - pv2_aligned(b)))
+        if miss:
+            want.append(("PV-B", " and ".join(miss)))
+    elif best < PV2_C_BEST:
+        miss = []
+        if len(c) < PV2_C_FRAMES:
+            miss.append("%d more under %.0f" % (PV2_C_FRAMES - len(c), PV2_C_DIST))
+        if pv2_aligned(c) < PV2_C_NEED_ALIGN:
+            miss.append("%d more agreeing" % (PV2_C_NEED_ALIGN - pv2_aligned(c)))
+        if pv2_spread(c) < PV2_C_NEED_SPREAD:
+            miss.append("a second clip moment")
+        if miss:
+            want.append(("PV-C", " and ".join(miss)))
+    if not want:
+        return "best frame at %.0f, too far for any bar" % best
+    name, detail = want[0]
+    return "%s needs %s" % (name, detail)
+
+
+def pv2_scorecard(film_hits: dict, cells: dict | None = None, top: int = 5) -> list:
+    """The hint bucket: every film the probe saw, with the SHAPE of its evidence.
+
+    The shape is what separates a real match from a look-alike, and it is the same shape the
+    bars judge - how many frames matched, how well they agree on one film-time offset, how
+    many separate clip moments they came from - plus which of the probe's views found them,
+    which no hint has ever carried.
+
+    band is a coarse verdict for a system that will not read the numbers:
+
+      strong  a good frame AND corroboration: best under 20 with two hits agreeing
+      medium  something real but thin: best under 33, with either agreement or 3+ frames
+      weak    one stray frame, or several that agree about nothing
+
+    The bands are MEASURED, not asserted - two_pass_lab.py --hints prints each band's
+    precision over the dumped evidence of all 80 edited and 125 real clips. Treat the
+    numbers as the output and the band as a convenience.
+
+    Returns [{vidx, frames, best, avg, aligned, clusters, biggest, moments, offset_s,
+              views, band, shortfall}, ...], strongest first."""
+    out = []
+    for v, hits in film_hits.items():
+        rows = sorted(hits.values())
+        if not rows:
+            continue
+        best = float(rows[0][0])
+        n = len(rows)
+        avg = sum(r[0] for r in rows) / n
+        clusters = pv2_offset_clusters(rows)
+        biggest = len(clusters[0]) if clusters else 0
+        b = [r for r in rows if r[0] < PV2_B_DIST]
+        c = [r for r in rows if r[0] < PV2_C_DIST]
+        aligned = pv2_aligned(b)
+        moments = pv2_spread(c)
+        views = ""
+        if cells:
+            views = ",".join(sorted({"%s:%s" % (g, vc)
+                                     for (vv, _si, g, vc) in cells if vv == v}))
+        if best < PV2_B_BEST and biggest >= 2:
+            band = "strong"
+        elif best < PV2_C_DIST and (biggest >= 2 or n >= PV2_B_FRAMES):
+            band = "medium"
+        else:
+            band = "weak"
+        out.append({"vidx": int(v), "frames": n, "best": best, "avg": float(avg),
+                    "aligned": aligned, "clusters": len(clusters), "biggest": biggest,
+                    "moments": moments,
+                    "offset_s": float(clusters[0][0][0]) if clusters else 0.0,
+                    "views": views, "band": band, "shortfall": pv2_shortfall(rows)})
+    out.sort(key=lambda d: (PV2_BAND_RANK[d["band"]], d["best"], -d["frames"]))
+    return out[:top]
+
+
+def pv2_scorecard_str(card: list, index: "LoadedIndex", top: int = 3) -> str:
+    """The scorecard packed for one CSV cell: candidates separated by ';', fields by '~'.
+
+    label~band~frames~best~avg~aligned~clusters~biggest~moments~views~shortfall
+
+    Packed rather than spread over columns because the number of candidates varies, and the
+    existing best_hint column stays exactly as it was so metrics.parse_hint keeps working."""
+    parts = []
+    for d in card[:top]:
+        parts.append("~".join([
+            (index.label(d["vidx"]) or str(d["vidx"])).replace("~", "-").replace(";", ","),
+            d["band"], str(d["frames"]), "%.0f" % d["best"], "%.1f" % d["avg"],
+            str(d["aligned"]), str(d["clusters"]), str(d["biggest"]), str(d["moments"]),
+            d["views"], d["shortfall"].replace("~", "-").replace(";", ","),
+        ]))
+    return ";".join(parts)
+
+
+def _merge_film_hits(into: dict, extra: dict) -> dict:
+    """Fold a second collection pass into the first, keeping the better hit per
+    (film, sampled frame) - the same rule a single pass applies."""
+    for v, hits in extra.items():
+        dst = into.setdefault(v, {})
+        for si, row in hits.items():
+            cur = dst.get(si)
+            if cur is None or row[0] < cur[0]:
+                dst[si] = row
+    return into
+
+
+def _probe_give_up(run: "ProbeRun", delta: dict, two_stage: bool) -> bool:
+    """Has the probe seen enough to stop sampling this clip?
+
+    Measured over all 125 clips with replay_rules.py, the two bars are not close:
+
+      "run"   stop while the WHOLE run so far has found nothing under MAX_HAMMING. 49% of
+              the sampled frames, and DECISION-IDENTICAL to the full scan: 47 right, 1
+              wrong, the same film on all 48 answers. Clips that are not in the catalogue
+              produce no hit at all on their first 8 frames - the ones that are hit at a
+              median best distance of 16 - so this separates them cleanly.
+      "wave"  stop when one wave adds no NEW hit. 40% of the frames but it loses 4 correct
+              answers: evidence arrives in bursts, and a quiet wave is not a verdict.
+
+    Giving up here is not the clip's verdict. identify_clip falls through to the full
+    streaming pass, which has its own probe and rules, so this costs an early exit only."""
+    if PV2_WAVE_BAR == "off":
+        return False
+    if len(run.consumed) < PV2_GIVEUP_MIN_FRAMES:
+        # Jude's Part 6: a bad score on 8 frames does not mean the film is absent, it
+        # means we have not seen enough of the clip yet. Hold the bar until this many
+        # frames have been looked at.
+        return False
+    nothing = (not run.film_hits) if PV2_WAVE_BAR == "run" else (not delta)
+    if not nothing:
+        return False
+    if two_stage and run.has_unhashed_extra():
+        # A mirrored clip finds nothing AT ALL on the plain views - that is the premise of
+        # the two-stage economy - so the mirror pass has to run over the frames already
+        # decoded before this clip may be called hopeless. Without this the bar would
+        # abandon every mirrored clip on wave one and it would never get the pass that
+        # identifies it. If the mirrors do find something the next wave judges it.
+        run.extend(run.consumed, views="extra")
+        return not run.film_hits
+    return True
+
+
+def _staged_probe(run: "ProbeRun", resample: bool):
+    """The two passes and the fallback. See PV2_PASSES for what each stage is and why.
+
+    All three stages take DIFFERENT frames - consecutive slices of pv2_sample_order, so each
+    slice is spread over the whole clip and no frame is ever sampled twice. What they share
+    is the DECODED frames: stage two asks for the uncropped pictures of stage one's frames as
+    well as its own, and the ledger inside ProbeRun means that costs the hashing and not the
+    seeking. That is the whole reason the passes are cheap enough to be worth splitting.
+
+    Returns (hit, ranked, where)."""
+    order = pv2_sample_order(run.n_samples)
+    n1 = max(0, min(PV2_PASS1_FRAMES, run.n_samples))
+    n2 = max(0, min(PV2_PASS2_FRAMES, run.n_samples - n1))
+    n3 = max(0, min(PV2_PASS3_FRAMES, run.n_samples - n1 - n2))
+    cropped = [g for g in run.groups if g in PV2_CROPPED_GROUPS]
+    uncropped = [g for g in run.groups if is_uncropped(g)]
+
+    # ---- stage 1: the cropped pictures of the first slice --------------------------------
+    run.extend(order[:n1], views="all", groups=cropped)
+    hit, ranked = pv2_decide(run.film_hits)
+    if hit is not None and hit["tier"] in PV2_WAVE_EARLY_TIERS:
+        return hit, ranked, "pass 1 cropped, %d frames" % n1
+
+    # ---- stage 2: the uncropped pictures, over the new slice AND stage one's frames -------
+    if n2 or uncropped:
+        run.extend(order[:n1 + n2], views="all", groups=run.groups)
+        hit, ranked = pv2_decide(run.film_hits)
+        if hit is not None and hit["tier"] in PV2_WAVE_EARLY_TIERS:
+            return hit, ranked, "pass 2 uncropped, %d+%d frames" % (n1, n2)
+
+    # ---- stage 3: the fallback - more frames, the same bars -------------------------------
+    # Measured on the 125 real clips: with the probe's own bars this recovers 12, 12 and 16
+    # of the 94 fall-throughs at 8, 12 and 20 frames, so the frames are what pay. Looser bars
+    # recover 17 and add a second wrong answer; shape-only bars do worse still (7, 9, 12).
+    # They looked best on the edited suite, which holds only two distinct wrong films across
+    # 78 clips and so cannot punish a loose rule at all - which is why the fallback ships
+    # with the probe's bars and the frames turned up instead.
+    if n3:
+        run.extend(order[:n1 + n2 + n3], views="all", groups=run.groups)
+        hit, ranked = pv2_decide(run.film_hits)
+        if hit is not None:
+            return hit, ranked, "fallback, %d+%d+%d frames" % (n1, n2, n3)
+
+    hit, ranked = pv2_decide(run.film_hits)
+    return hit, ranked, "all three stages, %d frames" % (n1 + n2 + n3)
+
+
+def super_probe(video_path: str, index: LoadedIndex, groups: List[str],
+                two_stage: bool | None = None, maxdim: int | None = None,
+                resample: bool | None = None):
+    """The probe, version 2: collect the evidence IN WAVES, judging after each one.
+
+    The samples are taken a wave at a time in pv2_sample_order, so every wave is spread over
+    the whole clip and the union of the waves so far stays spread. After each wave the
+    rulebook runs: a clip whose answer is already clear stops there, and a clip that has
+    found nothing at all is given up on (see _probe_give_up). Measured over the 125 real
+    clips this is DECISION-IDENTICAL to sampling everything - 47 right, 1 wrong, the same
+    film on all 48 answers - at 49% of the sampled frames:
+
+        python replay_rules.py --rules adopted --waves 8,16,24,40 --bar run --audit-waves
+
+    Note what does NOT work, so nobody tries it again: taking fewer frames across the board.
+    Flat decimation to 20 evenly spread samples drops 47 right to 31, because the bars reward
+    hits that agree on a film-time offset and thinning the samples destroys the agreement.
+    The ordering is load-bearing too - radical-inverse 47 right, golden-ratio 43, the plain
+    ascending order the probe used to take 43.
+
+
+    With two_stage on, the plain views are collected and judged first, and the mirrored and
+    letterbox-trimmed views are only collected if the plain views did not already produce an
+    answer. That is **recall-identical by construction** - an accepted clip would have been
+    accepted on the plain views either way, and a declined clip still ends up judged on
+    exactly the same total evidence - so it needs measuring only to size the saving, not to
+    check it is safe. Measured on the Brick clip: 10.6 s instead of 22.3 s, same 13 hits at
+    best distance 8.
+
+    (A more aggressive gate - skip the extra views whenever the plain views found any film at
+    all - would save more on declined clips too, but it is NOT recall-safe: a mirrored clip
+    can pick up a junk candidate on its plain views and would then never get the mirror pass
+    that identifies it. If that gate is ever wanted, measure it with
+    `dump_probe_evidence.py --views plain` against the full dump first.)"""
+    two_stage = PV2_TWO_STAGE if two_stage is None else two_stage
+    resample = PV2_RESAMPLE if resample is None else resample
+    first = "plain" if two_stage else "all"
+    # The staged form hands each stage the frames the one before it decoded, so the frames
+    # have to be kept: without this stage two would seek stage one's slice all over again,
+    # which is the cost the whole split exists to avoid.
+    run = ProbeRun(video_path, index, groups, maxdim=maxdim,
+                   keep_frames=(two_stage or resample or PV2_PASSES))
+    if not run.ok:
+        return None, [], []
+    try:
+        if PV2_PASSES:
+            # the cropped pass, then the uncropped one, then the fallback
+            hit, ranked, where = _staged_probe(run, resample)
+            card = pv2_scorecard(run.film_hits, run.cells)
+            ev = run.evidence()
+            if hit is None:
+                return None, ranked, card
+            print(f"[PROBE-V2] {hit['tier']} HIT in {ev['elapsed_s']:.1f}s ({where}, "
+                  f"{len(run.consumed)}/{run.n_samples} frames; seek {ev['seek_s']:.1f}s "
+                  f"hash {ev['hash_s']:.1f}s search {ev['search_s']:.1f}s): "
+                  f"vidx={hit['vidx']} {hit['detail']} -> early accept")
+            return hit, ranked, card
+
+        hit, ranked = None, []
+        wave = 0
+        gave_up = out_of_time = False
+        for idxs in run.schedule():
+            wave += 1
+            last = (wave == run.n_waves)
+            _, delta = run.extend(idxs, views=first)
+            # The whole run's evidence, not just this wave's - see PV2_CARRY_FORWARD.
+            hit, ranked = pv2_decide(run.film_hits if PV2_CARRY_FORWARD else delta)
+            if hit is not None and not (last or hit["tier"] in PV2_WAVE_EARLY_TIERS):
+                # A bar fired, but not one that is trusted on partial evidence. P3.5 turns on
+                # being the SOLE candidate in the index, and a later wave can find it a
+                # rival, so accepting it here would answer where the full scan refuses.
+                hit = None
+            if hit is not None or last:
+                break
+            if _probe_give_up(run, delta, two_stage):
+                gave_up = True
+                break
+            if PV2_BUDGET_S > 0 and (time.perf_counter() - run._t0) >= PV2_BUDGET_S:
+                # Out of time. This is not the give-up bar - that one says the clip looks
+                # unfindable, this one says only that it is slow - so the evidence gathered
+                # so far still goes to the later stages exactly as it would have done.
+                out_of_time = True
+                break
+        where = "wave %d of %d%s" % (wave, run.n_waves,
+                                     ", gave up" if gave_up else
+                                     ", out of time" if out_of_time else "")
+
+        if hit is None and two_stage and run.has_unhashed_extra():
+            # The frames are already in hand, so this re-reads nothing. Running the extra
+            # views ONCE here rather than per wave is what keeps the two-stage economy
+            # recall-identical while not charging the mirror cost to clips that accept early.
+            run.extend(run.consumed, views="extra")
+            hit, ranked = pv2_decide(run.film_hits)
+            where += ", + mirrored views"
+
+        if hit is None and resample and ranked:
+            # Nothing passed, but some film is in the running. Look again, densely, around
+            # the moments that already matched - and only at the shortlisted films, so the
+            # round costs the same whether the catalogue holds 134 films or 14,686.
+            shortlist = [int(v) for _, _, v, _ in ranked[:PV2_SHORTLIST]]
+            resample_candidates(video_path, index, groups, run.film_hits, shortlist,
+                                maxdim=maxdim, run=run)
+            hit, ranked = pv2_decide(run.film_hits)
+            where += ", + second round"
+
+        ev = run.evidence()
+        card = pv2_scorecard(run.film_hits, run.cells)
+        if hit is None:
+            return None, ranked, card
+        print(f"[PROBE-V2] {hit['tier']} HIT in {ev['elapsed_s']:.1f}s ({where}, "
+              f"{len(run.consumed)}/{run.n_samples} frames; seek {ev['seek_s']:.1f}s "
+              f"hash {ev['hash_s']:.1f}s search {ev['search_s']:.1f}s): "
+              f"vidx={hit['vidx']} {hit['detail']} -> early accept")
+        return hit, ranked, card
+    finally:
+        run.close()
 
 
 def identify_clip(video_path: str, index: LoadedIndex, *, verbose: bool = True, prescan: bool = True) -> ClipResult:
@@ -1194,7 +2412,7 @@ def identify_clip(video_path: str, index: LoadedIndex, *, verbose: bool = True, 
     # ---- a. the probe V2 (replaces the pre-scan; set PDQ_PROBE_ONLY=1 to also skip the
     #         streaming pass, so the probe is the entire engine) -----------------------------
     if prescan:
-        hit, probe_ranked = super_probe(video_path, index, groups)
+        hit, probe_ranked, probe_card = super_probe(video_path, index, groups)
         if hit:
             v = int(hit["vidx"])
             st = movie_stats[v]
@@ -1203,14 +2421,15 @@ def identify_clip(video_path: str, index: LoadedIndex, *, verbose: bool = True, 
                              dur, dur, 0, 0, 0, time.time() - t_start,
                              [(hit["frames"], float(hit["min_hamming"]), v, float(hit["offset"]))],
                              [(v, _hamming_range_str(hit["min_hamming"]), hit["frames"], float(hit["min_hamming"]))],
-                             movie_stats, wait_seconds_for_reason(hit["reason"]))
+                             movie_stats, wait_seconds_for_reason(hit["reason"]), probe_card)
             _print_outcome(res, index, say)
             return res
         if os.environ.get("PDQ_PROBE_ONLY") == "1":
             hints = [(v, _hamming_range_str(a), n, a) for n, a, v, _ in probe_ranked if a < 45.0]
             hints.sort(key=lambda x: (-x[2], x[3]))
             res = ClipResult(False, None, None, "", "PROBE_NO_MATCH", "probe-v2 found no film it trusts", False,
-                             dur, dur, 0, 0, 0, time.time() - t_start, probe_ranked, hints[:50], movie_stats, 0.0)
+                             dur, dur, 0, 0, 0, time.time() - t_start, probe_ranked, hints[:50],
+                             movie_stats, 0.0, probe_card)
             _print_outcome(res, index, say)
             return res
         say("[PROBE-V2] no accept -> running full pass-1 (cropped)")
@@ -1305,22 +2524,19 @@ def identify_clip(video_path: str, index: LoadedIndex, *, verbose: bool = True, 
                     say(f"[PROBE] lowered quality_min -> {quality_min} (no hashes yet)")
                 else:
                     probe["done"] = True
-                    md, best_v = None, None
-                    if n_probe:
-                        xq = np.frombuffer(b"".join(probe["hashes"]), dtype=np.uint8).reshape(-1, 32)
-                        D, I = index.index_by_group[probe["group"]].search(xq, K_PER_HASH)
-                        if D.size:
-                            j = int(D.argmin()); md = int(D.flat[j]); nn = int(I.flat[j])
-                            if 0 <= nn < len(index.meta_vid[probe["group"]]):
-                                best_v = int(index.meta_vid[probe["group"]][nn])
-                    likely = md is not None and md < PROBE_ACCEPT_HAMMING
-                    say(f"[PROBE] likely_match={likely} min_neighbor_hamming={md} closest_movie={index.label(best_v) if best_v is not None else None} "
-                        f"closest_group={probe['group']} hashes={n_probe} elapsed={elapsed:.2f}s")
                     # P0 is RETIRED in this engine version. The probe V2 (whole clip, with
                     # corroboration) replaces it; a single frame under 30 from the first four
                     # seconds answers nothing any more. Genuine matches that P0 used to take
-                    # are caught by P1/P2 a moment later with more evidence. The probe still
-                    # runs for its other job: lowering the quality bar on clips with no hashes.
+                    # are caught by P1/P2 a moment later with more evidence. The old probe
+                    # still runs for its other job: lowering the quality bar on clips with no
+                    # hashes (the branch above).
+                    #
+                    # Its index search used to live here. It accepted nothing and its only
+                    # consumer was the [PROBE] line below, so it was one whole exhaustive
+                    # sweep of up to 64 fingerprints per clip spent on a printout. Removed.
+                    # The line still reports what the old probe collected, without searching.
+                    say(f"[PROBE] P0 retired; collected {n_probe} fingerprints from "
+                        f"group={probe['group']} in {elapsed:.2f}s (no search, nothing accepted)")
         # ---- every 4 new hashes: search, count, run the rules ----
         if total_hashes >= STREAM_START_HASHES and (total_hashes - last_checked) >= STREAM_BATCH_HASHES and frame_hashes:
             last_checked = total_hashes

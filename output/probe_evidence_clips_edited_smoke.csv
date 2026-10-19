@@ -1,0 +1,3 @@
+list,clip,expected_film,in_catalogue,duration_s,n_samples,groups,n_hashes,index_searches,films_hit,hits,collect_s,resample_s,shortlist,note,edit,seek_s,hash_s,search_s,waves_used,frames_decoded,query_rows
+edited,vt_tiktok_com_ZSqXsLs5x___mirror.mp4,Magadheera,yes,209,40,FULL|LANDSCAPE|SQUARE,433,3,1,15,13.0,,,,mirror,2.10,8.16,2.59,1,40,433
+edited,vt_tiktok_com_ZSqXsLs5x___speed125.mp4,Magadheera,yes,167,40,FULL|LANDSCAPE|SQUARE,433,3,1,12,14.7,,,,speed125,2.67,9.91,2.05,1,40,433
