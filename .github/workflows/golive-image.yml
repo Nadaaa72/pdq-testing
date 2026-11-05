@@ -1,0 +1,59 @@
+name: golive image
+
+# Builds the "PDQ testing to go live" image (pdq_golive/Dockerfile) and pushes it to GHCR as a
+# private package, tagged with the commit sha. Only pdq_golive/ goes into the image (.dockerignore).
+on:
+  push:
+    branches: [pdq-golive]
+    paths: ["pdq_golive/**", ".github/workflows/golive-image.yml", ".dockerignore"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: |
+          python3 -m pip install --quiet pytest
+          python3 -m pytest pdq_golive/tests -q
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image name (GHCR needs lower case)
+        id: img
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/pdq-golive" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: pdq_golive/Dockerfile
+          push: true
+          build-args: GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ steps.img.outputs.name }}:${{ github.sha }}
+            ${{ steps.img.outputs.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Prove the image holds no keys or data
+        run: |
+          IMG=${{ steps.img.outputs.name }}:${{ github.sha }}
+          docker pull "$IMG"
+          docker run --rm --entrypoint sh "$IMG" -c '
+            set -e
+            ls -R /app | head -50
+            ! find / -xdev \( -name "credentials.env" -o -name "*.env" -o -name ".env" \) 2>/dev/null | grep -v "^/proc" | grep -q .
+            ! grep -rIl -E "B2_APP_KEY=|DATABASE_URL=|postgres://" /app 2>/dev/null | grep -q .
+            echo "no keys in image"'

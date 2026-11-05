@@ -1,0 +1,8 @@
+# The golive image takes pdq_golive/ only. Everything else stays out, above all keys and data.
+*
+!pdq_golive/
+pdq_golive/**/__pycache__
+pdq_golive/**/*.pyc
+**/credentials.env
+**/*.env
+**/.env
