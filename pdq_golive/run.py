@@ -29,6 +29,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 
 import decide as D          # noqa: E402
+import loader as LD         # noqa: E402
 import profiles as P        # noqa: E402
 
 ENGINE_FILE = os.environ.get("GOLIVE_ENGINE", "")
@@ -157,8 +158,12 @@ def run_one(E, idx, hook: Hook, row: dict, profile: str, guard: bool, fix1: bool
     used = len(run.consumed) if run is not None else 0
     rec.update({
         "duration_s": round(dur or 0, 2), "groups": groups,
-        "answer": idx.label(hit["vidx"]) if hit else "", "vidx": hit["vidx"] if hit else None,
-        "tier": hit["tier"] if hit else "",
+        # a placeholder film (rows whose shard has no film table in B2) is no answer
+        "unmapped": bool(hit and LD.is_unmapped(idx.label(hit["vidx"]))),
+        "raw_answer": idx.label(hit["vidx"]) if hit else "",
+        "answer": idx.label(hit["vidx"]) if (hit and not LD.is_unmapped(idx.label(hit["vidx"]))) else "",
+        "vidx": hit["vidx"] if hit else None,
+        "tier": hit["tier"] if (hit and not LD.is_unmapped(idx.label(hit["vidx"]))) else "",
         "wall_s": round(wall, 3), "cpu_s": round(cpu, 3),
         "answer_s": round(hook.answer_at, 3) if (hit and hook.answer_at is not None) else None,
         "seek_s": round(ev.get("seek_s", 0), 3), "hash_s": round(ev.get("hash_s", 0), 3),
@@ -192,6 +197,7 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
 
     E, epath = load_engine()
+    LD.install(E)
     hook = Hook(E)
     t = time.perf_counter()
     idx = E.load_index(a.index)
@@ -221,8 +227,10 @@ def main(argv=None) -> int:
                     continue
                 rec = run_one(E, idx, hook, row, p, guard, not a.no_fix1)
                 rec["order"] = "|".join(order)
+                rec["groups_loaded"] = sorted(idx.index_by_group)
                 f.write(json.dumps(rec, default=str) + "\n")
                 f.flush()
+                os.fsync(f.fileno())        # a pod that stops keeps every finished clip
                 print("[%d/%d] %-10s %-40s %6.2fs %s %s" % (
                     i + 1, len(rows), p, rec["clip"][:40], rec.get("wall_s") or -1,
                     rec.get("tier") or "-", (rec.get("answer") or rec.get("error") or "")[:40]),

@@ -177,24 +177,36 @@ def main() -> int:
         film_list += m.get("video_paths") or []
     labels = len(film_list)
     ids = [x.split(":", 1)[0] for x in film_list]
-    (dest / "film_list.json").write_text(json.dumps(film_list))
     log["films_in_manifests"] = labels
     log["repeated_film_ids"] = len(ids) - len(set(ids))
+    # Some shards in B2 have a film-time table for a group but no film table (found on the
+    # pod in run 1, 5 Nov). Their rows still sit in the ivf, so leaving them out shifts every
+    # later row onto the wrong film. Instead each gets rows pointing at a placeholder film
+    # "UNMAPPED:<shard>", appended after the real labels so no real film number moves. The
+    # runner reports an answer on a placeholder as no answer and counts it separately.
+    placeholder = {}
     rows_info = {}
     for g in GROUPS:
         N = json.loads((ivf / ("ivf_%s.json" % g)).read_text())["N"]
         fv = open(rt / ("rt_meta_vid_%s__golive.bin" % g), "wb")
         ft = open(rt / ("rt_meta_ts_%s__golive.bin" % g), "wb")
-        rows = missing = 0
+        rows = missing = padded = 0
         for n in names:
             d = shard_root / "shards" / n
             v = sorted(d.glob("meta_vid_%s__*.bin" % g))
             t = sorted(d.glob("meta_ts_%s__*.bin" % g))
-            if not v:
+            if not v and not t:
                 missing += 1
                 continue
-            sv = np.fromfile(v[0], dtype="<u8").astype(np.int64) + offs[n]
             st = np.fromfile(t[0], dtype="<f4")
+            if v:
+                sv = np.fromfile(v[0], dtype="<u8").astype(np.int64) + offs[n]
+            else:
+                if n not in placeholder:
+                    placeholder[n] = len(film_list)
+                    film_list.append("UNMAPPED:%s" % n)
+                sv = np.full(st.size, placeholder[n], dtype=np.int64)
+                padded += st.size
             if sv.size != st.size:
                 raise SystemExit("shard %s group %s: %d film rows vs %d time rows" % (n, g, sv.size, st.size))
             sv.astype("<i8").tofile(fv)
@@ -203,9 +215,11 @@ def main() -> int:
         fv.close()
         ft.close()
         rows_info[g] = {"ivf_N": N, "rows_built": rows, "shards_without_group": missing,
-                        "covers_ivf": rows >= N}
+                        "placeholder_rows": padded, "exact": rows == N, "covers_ivf": rows >= N}
         print("[fetch] rtmeta %-9s N=%d rows=%d covers=%s" % (g, N, rows, rows >= N), flush=True)
     log["rtmeta"] = rows_info
+    log["placeholder_shards"] = sorted(placeholder)
+    (dest / "film_list.json").write_text(json.dumps(film_list))
     stage("rtmeta", 0, t0)
     if not all(r["covers_ivf"] for r in rows_info.values()):
         print("[fetch] RTMETA SHORTER THAN IVF", flush=True)

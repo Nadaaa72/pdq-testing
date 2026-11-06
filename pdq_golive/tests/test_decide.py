@@ -100,3 +100,9 @@ def test_profile_unknown_setting_fails_loudly():
     except AttributeError:
         return
     raise AssertionError("missing setting was not reported")
+
+
+def test_placeholder_film_counts_as_no_answer():
+    import loader as LD
+    assert LD.is_unmapped("UNMAPPED:shard_001406")
+    assert not LD.is_unmapped("43847:F1: The Movie (tmdb=911430)")
