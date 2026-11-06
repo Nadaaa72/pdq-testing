@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 NAME = "PDQ testing to go live"
 ALLOWED = {"B2_KEY_ID", "B2_APP_KEY", "B2_BUCKET", "B2_ENDPOINT", "GOLIVE_MAX_MIN",
-           "PDQ_IVF_NPROBE", "OMP_NUM_THREADS"}
+           "PDQ_IVF_NPROBE", "OMP_NUM_THREADS", "PUBLIC_KEY"}
 
 
 def cred(name: str) -> str:
@@ -69,6 +69,11 @@ def main() -> int:
         {"key": "PDQ_IVF_NPROBE", "value": "16"},
         {"key": "OMP_NUM_THREADS", "value": "16"},
     ]
+    # The account's public SSH key, so boot.sh can let us in without editing the pod after it
+    # starts (run 1 had to, which restarts the container). A public key is not a secret.
+    pub = gql(key, "query { myself { pubKey } }")["myself"]["pubKey"] or ""
+    if pub.strip():
+        env.append({"key": "PUBLIC_KEY", "value": pub.strip()})
     existing = [t for t in gql(key, "query { myself { podTemplates { id name } } }")["myself"]["podTemplates"]
                 if t["name"] == NAME]
     inp = {"name": NAME, "imageName": a.image, "containerDiskInGb": a.disk_gb, "volumeInGb": 0,

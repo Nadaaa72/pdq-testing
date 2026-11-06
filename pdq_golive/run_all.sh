@@ -28,13 +28,21 @@ print("manifests ok", len(rows), "proof", len(strong))
 P
 (vmstat -t 5 > $O/vmstat.log 2>&1 &) ; (iostat -x 5 > $O/iostat.log 2>&1 &)
 R="python3 /app/pdq_golive/run.py"
-phase "proof start";  $R --manifest m_proof.csv --out $O/proof.jsonl --profiles golive_g16 > $O/proof.log 2>&1; phase "proof end rc=$?"
+phase "proof start";  $R --manifest m_proof.csv --out $O/proof.jsonl --profiles golive_g16 > $O/proof.log 2>&1; rc=$?; phase "proof end rc=$rc"
+# exit 4 = the loader refused a group that pushed memory past GOLIVE_MAX_ANON_GB (run 1: PORTRAIT).
+# Go on without it, and say so in every result (groups_loaded).
+if [ "$rc" = "4" ]; then
+  export GOLIVE_SKIP_GROUPS=PORTRAIT; phase "PORTRAIT refused: continuing without it"
+  $R --manifest m_proof.csv --out $O/proof.jsonl --profiles golive_g16 >> $O/proof.log 2>&1; phase "proof retry end rc=$?"
+fi
 phase "main start";   $R --manifest m_main.csv --out $O/main.jsonl --profiles golive_g16 > $O/main.log 2>&1;    phase "main end rc=$?"
 phase "cmp start";    $R --manifest m_cmp.csv --out $O/cmp.jsonl --profiles today,A,B,golive_g16 --rotate > $O/cmp.log 2>&1; phase "cmp end rc=$?"
 phase "np32 start";   PDQ_IVF_NPROBE=32 $R --manifest m_np32.csv --out $O/np32.jsonl --profiles golive_g16 > $O/np32.log 2>&1; phase "np32 end rc=$?"
 for k in 2 4; do
   phase "conc$k start"
-  for i in $(seq 0 $((k-1))); do timeout 600 $R --manifest m_c${k}_$i.csv --out $O/conc${k}_$i.jsonl --profiles golive_g16 > $O/conc${k}_$i.log 2>&1 & done
+  # several processes each loading a group into RAM would exhaust the pod: cap each at 20 GB
+  # of anonymous memory, so a group that is not zero-copy here makes them exit (code 4) cleanly
+  for i in $(seq 0 $((k-1))); do GOLIVE_MAX_ANON_GB=20 timeout 600 $R --manifest m_c${k}_$i.csv --out $O/conc${k}_$i.jsonl --profiles golive_g16 > $O/conc${k}_$i.log 2>&1 & done
   wait; phase "conc$k end"
 done
 echo ALL_DONE >> $O/phases.log
