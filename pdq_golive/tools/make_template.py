@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 NAME = "PDQ testing to go live"
 ALLOWED = {"B2_KEY_ID", "B2_APP_KEY", "B2_BUCKET", "B2_ENDPOINT", "GOLIVE_MAX_MIN",
-           "PDQ_IVF_NPROBE", "OMP_NUM_THREADS", "PUBLIC_KEY"}
+           "PDQ_IVF_NPROBE", "OMP_NUM_THREADS", "PUBLIC_KEY", "GOLIVE_SESSION"}
 
 
 def cred(name: str) -> str:
@@ -50,7 +50,8 @@ def main() -> int:
     ap.add_argument("--image", required=True)
     ap.add_argument("--registry-auth", default="")
     ap.add_argument("--disk-gb", type=int, default=300)
-    ap.add_argument("--max-min", type=int, default=170)
+    ap.add_argument("--max-min", type=int, default=165)
+    ap.add_argument("--session", default="1", help="1 = boot runs session.sh on its own")
     a = ap.parse_args()
     key = cred("RUNPOD_API_KEY")
     endpoint = ""
@@ -68,6 +69,7 @@ def main() -> int:
         {"key": "GOLIVE_MAX_MIN", "value": str(a.max_min)},
         {"key": "PDQ_IVF_NPROBE", "value": "16"},
         {"key": "OMP_NUM_THREADS", "value": "16"},
+        {"key": "GOLIVE_SESSION", "value": a.session},
     ]
     # The account's public SSH key, so boot.sh can let us in without editing the pod after it
     # starts (run 1 had to, which restarts the container). A public key is not a secret.

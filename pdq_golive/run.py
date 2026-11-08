@@ -20,6 +20,7 @@ import csv
 import importlib.util
 import json
 import os
+import signal
 import sys
 import time
 from pathlib import Path
@@ -104,6 +105,14 @@ class Hook:
         return hit, ranked
 
 
+class ClipTimeout(Exception):
+    pass
+
+
+def _alarm(signum, frame):
+    raise ClipTimeout()
+
+
 def _proc_stats() -> dict:
     out = {}
     try:
@@ -145,11 +154,24 @@ def run_one(E, idx, hook: Hook, row: dict, profile: str, guard: bool, fix1: bool
     hook.reset()
     hook.run = None
     t0, c0 = time.perf_counter(), time.process_time()
+    # A clip that runs past GOLIVE_CLIP_TIMEOUT seconds is recorded and skipped: run 5's
+    # comparison sat on one clip for 50 minutes and never finished.
+    limit = int(os.environ.get("GOLIVE_CLIP_TIMEOUT", "0") or 0)
+    if limit and hasattr(signal, "SIGALRM"):
+        signal.signal(signal.SIGALRM, _alarm)
+        signal.alarm(limit)
     try:
         hit = E.super_probe(path, idx, groups, maxdim=(s["PV2_MAXDIM"] or None))[0]
+    except ClipTimeout:
+        rec.update(error="timeout %ds" % limit, wall_s=round(time.perf_counter() - t0, 3))
+        return rec
     except Exception as e:
+        if limit and hasattr(signal, "SIGALRM"):
+            signal.alarm(0)
         rec.update(error=str(e)[:200], wall_s=round(time.perf_counter() - t0, 3))
         return rec
+    if limit and hasattr(signal, "SIGALRM"):
+        signal.alarm(0)
     wall, cpu = time.perf_counter() - t0, time.process_time() - c0
     after = _proc_stats()
     run = hook.run

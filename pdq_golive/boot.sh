@@ -11,22 +11,12 @@ mkdir -p /workspace_golive /local_index
 exec > >(tee -a "$LOG") 2>&1
 echo "[boot] $(date -u +%FT%TZ) image ${GOLIVE_IMAGE_SHA:-unknown}"
 
-# 1. hard stop. GOLIVE_MAX_MIN defaults to 170 (2 h 50 min). The pod stops itself through the
-#    RunPod API (RunPod hands every pod RUNPOD_POD_ID and a pod-scoped RUNPOD_API_KEY), and
-#    the container then exits. A container exit alone could be restarted by RunPod, which is
-#    why the API stop comes first; the laptop-side timer (Part 20) is the third line.
-MAX_MIN="${GOLIVE_MAX_MIN:-170}"
-(
-  sleep $(( MAX_MIN * 60 ))
-  echo "[boot] HARD STOP after ${MAX_MIN} min"
-  if [ -n "${RUNPOD_POD_ID:-}" ] && [ -n "${RUNPOD_API_KEY:-}" ]; then
-    curl -s -m 20 -H "Content-Type: application/json" \
-      -H "Authorization: Bearer ${RUNPOD_API_KEY}" https://api.runpod.io/graphql \
-      -d "{\"query\":\"mutation { podStop(input: {podId: \\\"${RUNPOD_POD_ID}\\\"}) { id desiredStatus } }\"}" \
-      | head -c 300; echo
-  fi
-  kill 1
-) &
+# 1. hard stop. GOLIVE_MAX_MIN defaults to 165 (2 h 45 min). The pod ends itself through the
+#    RunPod API with the pod-scoped key RunPod hands every pod (selfstop.sh: terminate, then
+#    stop, then kill 1). Run 5 showed the laptop cannot be the guard: it lost its internet at
+#    the deadline. The laptop watchdog stays as the second line.
+MAX_MIN="${GOLIVE_MAX_MIN:-165}"
+( sleep $(( MAX_MIN * 60 )); bash /app/pdq_golive/selfstop.sh "hard stop after ${MAX_MIN} min" ) &
 echo "[boot] hard stop armed: ${MAX_MIN} min"
 
 # 2. sshd with the key RunPod hands in
@@ -41,8 +31,16 @@ mkdir -p /run/sshd && env -u B2_KEY_ID -u B2_APP_KEY -u B2_BUCKET -u B2_ENDPOINT
 
 # 3. the index, unless it is already complete on this disk
 if [ ! -f /local_index/READY ]; then
-  python3 /app/pdq_golive/fetch_index.py --dest /local_index
+  # run 5: the copy with 48 parallel requests failed; 8 with lenient checksums worked
+  export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+  export AWS_MAX_ATTEMPTS=10 AWS_RETRY_MODE=adaptive
+  python3 /app/pdq_golive/fetch_index.py --dest /local_index --workers 8
   rc=$?
+  if [ "$rc" != "0" ]; then
+    echo "[boot] index copy failed rc=$rc: fetch retry"
+    python3 /app/pdq_golive/fetch_index.py --dest /local_index --workers 4
+    rc=$?
+  fi
   # the key is needed for nothing else: drop it from this shell and every child from now on
   unset B2_KEY_ID B2_APP_KEY B2_BUCKET B2_ENDPOINT
   if [ "$rc" != "0" ]; then
@@ -66,5 +64,9 @@ export OMP_NUM_THREADS=${OMP_NUM_THREADS:-16}
 export CUDA_VISIBLE_DEVICES=""
 export GOLIVE_ENGINE=/app/pdq_golive/vendor/pdq_engine_PROBEV2.py
 EOF
+if [ "${GOLIVE_SESSION:-0}" = "1" ]; then
+  setsid nohup bash /app/pdq_golive/session.sh > /workspace_golive/session.out 2>&1 < /dev/null &
+  echo "[boot] session started"
+fi
 echo "[boot] idle; run: python3 /app/pdq_golive/run.py --help"
 sleep infinity
