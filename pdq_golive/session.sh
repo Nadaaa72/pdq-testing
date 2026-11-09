@@ -52,12 +52,13 @@ random.seed(44); w("m_time.csv", random.sample(rows, min(50, len(rows))))
 print("manifests", len(rows))
 P
 
-# c) evidence pass, 3 processes, 10 threads each (32 vCPU)
+# c) evidence pass in 4 shards, at most 2 processes at once (16 threads each, 32 vCPU).
+#    Run 6: 3 at once went past the container's 116 GB memory limit while loading (each
+#    process maps the index, and that counts towards the limit) and 2 were killed.
 phase "evidence start"
-for s in 0 1 2; do
-  OMP_NUM_THREADS=10 python3 $A/evidence.py --manifest m_all.csv --out "$O" --tag golive6 \
-    --shard $s/3 --timeout 180 > "$O/evidence_s$s.log" 2>&1 &
-done
+ev() { OMP_NUM_THREADS=16 python3 $A/evidence.py --manifest m_all.csv --out "$O" --tag golive6 \
+         --shard $1/4 --timeout 180 >> "$O/evidence_s$1.log" 2>&1; }
+( ev 0; ev 2 ) & ( ev 1; ev 3 ) &
 wait
 phase "evidence end"
 
